@@ -2,7 +2,7 @@
 
 **Document purpose:** define what the game contains, how its systems fit together, and what the team is committing to deliver. [Todo.md](Todo.md) is the ordered implementation checklist. [progression.md](progression.md) records actual project status.
 
-**Planning baseline:** 16 October 2026. Approximately five beginner-to-intermediate Unity developers; a possible 48-hour development window. This repository currently contains no Unity project. Everything below is proposed work, not an implemented feature. Time estimates are targets and assume the team can install a common editor and test on separate PCs early.
+**Planning baseline:** 16 October 2026. Approximately five beginner-to-intermediate Unity developers; a possible 48-hour development window. A Unity URP LAN development harness now exists. This document describes the full target design; consult progression.md for actual implemented scope. Time estimates are targets and assume the team can install a common editor and test on separate PCs early.
 
 ## 1. Executive summary
 
@@ -74,7 +74,7 @@ Lightweight cosmetics are part of the intended first version, but are an explici
 | Version control | Git, text serialization, visible meta files | Commit Assets with their .meta files, Packages, ProjectSettings |
 | Tests | Unity Test Framework for pure rules plus manual network sessions | Test actual host/client behavior in builds early |
 
-No exact editor or package version has been verified inside this repository because the project does not exist yet. Setup must record the selected editor in `ProjectSettings/ProjectVersion.txt` and resolved packages in `Packages/manifest.json` and `Packages/packages-lock.json`. Do not assume the newest NGO release fits every Unity 6 LTS patch. Use documentation matching the installed package.
+The initial project now pins Unity 6000.3.23f1, URP 17.3.0, NGO 2.13.1 and Transport 2.7.4; consult Packages and Docs/TestLog.md for resolved versions and validation. Setup must record the selected editor in `ProjectSettings/ProjectVersion.txt` and resolved packages in `Packages/manifest.json` and `Packages/packages-lock.json`. Do not assume the newest NGO release fits every Unity 6 LTS patch. Use documentation matching the installed package.
 
 NGO's official package documentation is the API reference; the older multiplayer documentation site identifies itself as no longer updated. Avoid combining RPC or authority examples from unrelated NGO versions. [Unity NGO package documentation](https://docs.unity3d.com/Packages/com.unity.netcode.gameobjects@latest/), [older documentation notice and NetworkTransform overview](https://docs-multiplayer.unity3d.com/netcode/current/components/networktransform/).
 

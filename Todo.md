@@ -2,7 +2,7 @@
 
 **Purpose:** explain how to build the game, in dependency order, with concrete tasks, owners, artifacts, and verification. [Plan.md](Plan.md) defines the intended behavior and scope. [progression.md](progression.md) contains actual progress and the next handoff.
 
-**Initial status:** planning documents exist; the Unity project and every gameplay feature below are still unimplemented. All implementation checkboxes are intentionally unchecked. Completing this document does not mean completing the game.
+**Current status:** a Unity URP LAN development harness exists. Checked tasks have implementation evidence; uncompleted game and team-validation tasks remain open. See Docs/TestLog.md and progression.md.
 
 ## How to use this checklist
 
@@ -48,19 +48,19 @@ Sections are dependency groups, not a ban on parallel preparation. D can build t
 
 ### Project and toolchain
 
-- [ ] **SET-01** Confirm the public title is `Who's Watching?`; use `WhosWatching` for filesystem-safe identifiers and C# namespaces. Set Windows desktop as the initial build target and keyboard/mouse as required input.
+- [x] **SET-01** Confirm the public title is `Who's Watching?`; use `WhosWatching` for filesystem-safe identifiers and C# namespaces. Set Windows desktop as the initial build target and keyboard/mouse as required input.
 - [ ] **SET-02** Inventory editor versions and available test PCs. Select one supported Unity 6 LTS patch that everyone can use; verify NGO/UTP compatibility in Package Manager and the matching official documentation before committing to it.
-- [ ] **SET-03** Create the Unity project at the repository root, preserving the existing Markdown files and `.gitignore`. Use the agreed 3D pipeline, preferably URP if nobody has an existing preference. Do not change render pipelines later in the jam.
+- [x] **SET-03** Create the Unity project at the repository root, preserving the existing Markdown files and `.gitignore`. Use the agreed 3D pipeline, preferably URP if nobody has an existing preference. Do not change render pipelines later in the jam.
 - [ ] **SET-04** Install compatible Netcode for GameObjects, Unity Transport, Input System, and the UI/text dependencies actually needed. Import TextMeshPro essentials if the chosen template requires them. Do not add Relay/cloud packages yet.
 - [ ] **SET-05** Enable visible meta files and text asset serialization. Confirm `.gitignore` excludes Library, Temp, Logs, local build output, and machine-specific settings. Commit Assets with matching .meta files, Packages, and ProjectSettings.
 - [ ] **SET-06** Create the folder layout from Plan section 15 inside `Assets/_WhosWatching`. Use the Unity Editor for asset/folder operations where needed to preserve .meta files and GUIDs.
-- [ ] **SET-07** Create `Main.unity`, add it as the initial enabled build scene/profile entry, and save a minimal camera/light/floor setup. Record that this is the release's single persistent session scene.
+- [x] **SET-07** Create `Main.unity`, add it as the initial enabled build scene/profile entry, and save a minimal camera/light/floor setup. Record that this is the release's single persistent session scene.
 - [ ] **SET-08** Set product name to `Who's Watching?` and a simple initial build version. Confirm a blank Windows development build launches before implementing gameplay.
 - [ ] **SET-09** Ask another developer to open the committed project using the pinned editor and build it. Resolve missing packages/references now, not at the final packaging gate.
 
 ### Agreements that unblock parallel work
 
-- [ ] **SET-10** Create `Docs/Decisions.md` with editor/package versions, render pipeline, initial platform, 1v1/2v2 cap, authority model, one-scene approach, input bindings, and agreed default balance values.
+- [x] **SET-10** Create `Docs/Decisions.md` with editor/package versions, render pipeline, initial platform, 1v1/2v2 cap, authority model, one-scene approach, input bindings, and agreed default balance values.
 - [ ] **SET-11** Assign A–E to named teammates and appoint A as Main scene integrator. Assign player-root ownership to A/B by agreement; D delivers arena/visual prefabs; E owns UI prefab assets; C owns station prefabs.
 - [ ] **SET-12** Agree branch/review rules: small commits, integrations every two to four hours, no simultaneous edits to Main, no upgrading packages without team agreement, and no replacing .meta files to hide merge conflicts.
 - [ ] **SET-13** Define `TeamId` with None/A/B, `MatchPhase` with Lobby/Countdown/Playing/Results, and small structs for input, gaze, effects, objectives, and results. Document field meaning, validity flags, and server/client writers.
@@ -76,11 +76,11 @@ Sections are dependency groups, not a ban on parallel preparation. D can build t
 
 **Window:** H2–4, continuing to G1 at H6. **Owner:** A; E supplies temporary controls. **Priority:** P0. **Dependencies:** SET-04, SET-07, shared identity contracts. **Output:** working direct host/join and four-player admission boundary.
 
-- [ ] **NET-01** Add exactly one NetworkManager and UnityTransport to the Main networking root. Select client-server topology, assign player prefab, configure registered prefabs, and use the installed package's supported APIs.
-- [ ] **NET-02** Create the primitive player root with one NetworkObject and server-authoritative NetworkTransform. Add a capsule renderer and CharacterController; avoid nested NetworkObjects for visual children.
+- [x] **NET-01** Add exactly one NetworkManager and UnityTransport to the Main networking root. Select client-server topology, assign player prefab, configure registered prefabs, and use the installed package's supported APIs.
+- [x] **NET-02** Create the primitive player root with one NetworkObject and server-authoritative NetworkTransform. Add a capsule renderer and CharacterController; avoid nested NetworkObjects for visual children.
 - [ ] **NET-03** Implement `NetworkGameManager` methods for StartHostDirect, StartClientDirect, Cancel/Leave, and shutdown completion. Put address/port validation and transport setup in this component, outside UI code.
-- [ ] **NET-04** Add temporary Host/Join/address/port/Leave controls. Choose a documented default port, such as 7777. Separate the host's listen/bind address from the address shown for a remote client to enter.
-- [ ] **NET-05** Make hosting configure a reachable LAN bind address and joining use the entered host address. Use loopback only for same-machine tests; explain the difference in debug help text.
+- [x] **NET-04** Add temporary Host/Join/address/port/Leave controls. Choose a documented default port, such as 7777. Separate the host's listen/bind address from the address shown for a remote client to enter.
+- [x] **NET-05** Make hosting configure a reachable LAN bind address and joining use the entered host address. Use loopback only for same-machine tests; explain the difference in debug help text.
 - [ ] **NET-06** Register connection/disconnection/shutdown handlers once and unregister them on teardown. Track a four-player registry by actual NGO client/network identity; never index a fixed array directly with a client ID.
 - [ ] **NET-07** Implement connection approval with a build/protocol token, payload length check, current-phase check, hard total cap of four including host, and reservation of pending approved slots. Release reservations on failure/timeout.
 - [ ] **NET-08** Configure server-side player spawning and one player object per connection. Give each player temporary debug identity/team state. Verify NGO owns spawn/despawn; clients do not independently instantiate gameplay copies.
@@ -88,7 +88,7 @@ Sections are dependency groups, not a ban on parallel preparation. D can build t
 - [ ] **NET-10** Implement clean Leave: suppress local input, initiate shutdown, wait for completion, then reload Main locally. Confirm the old network root cannot survive to create a duplicate.
 - [ ] **NET-11** Run host and client as separate processes; verify two distinct player objects appear on both. Disconnect the client, rejoin in Lobby, and verify the player count and registry recover.
 - [ ] **NET-12** Attempt a real LAN connection from a second PC. Check correct address, matching build, same-network reachability, and application firewall permission; log the exact outcome and fix failures before proceeding far into content.
-- [ ] **NET-13** Attempt a fifth connection using additional processes and an incompatible build token in a test harness. Verify approval rejects each appropriately and does not reserve a slot forever.
+- [x] **NET-13** Attempt a fifth connection using additional processes and an incompatible build token in a test harness. Verify approval rejects each appropriately and does not reserve a slot forever.
 - [ ] **NET-14** Commit the working connection baseline and record reproduction instructions. Keep cloud authentication and Relay absent from the P0 startup path.
 
 ## 02 — Implement server-controlled movement and looking
@@ -100,11 +100,11 @@ Sections are dependency groups, not a ban on parallel preparation. D can build t
 - [ ] **PLY-03** On network spawn, enable input, Camera, and AudioListener only for the local owner. Disable remote cameras/listeners. Initialize current identity/visual state immediately and subscribe to later changes.
 - [ ] **PLY-04** Implement owner input sampling and snapshots at about 20 Hz. Send yaw/pitch rather than a camera position; include current round ID, monotonically ordered sequence, and held flags.
 - [ ] **PLY-05** On the host, verify message sender owns that player, then reject non-finite values, bad ranges, old sequences, wrong-round snapshots, and excessive rates. Clamp movement magnitude and pitch; normalize yaw.
-- [ ] **PLY-06** Store the latest accepted input and server receipt time per player. After 0.25 seconds without fresh input, set movement/interact/gaze intent inactive. Ensure idle players still send heartbeats so valid gaze is not expired accidentally.
-- [ ] **PLY-07** Implement server-only CharacterController movement at the agreed simulation rate. Apply base 5 m/s speed, normalized movement relative to accepted yaw, gravity, and collision. Never run the same simulation on both host client and host server paths.
-- [ ] **PLY-08** Set up physics layers so players collide with solid world geometry but do not push/block one another. Keep target colliders eligible for gaze queries despite the movement collision matrix.
-- [ ] **PLY-09** Replicate root position/yaw through server-authoritative NetworkTransform. Confirm its installed-version authority setting in the Inspector or supported override, rather than relying on an unrelated tutorial's component.
-- [ ] **PLY-10** Rotate the owner camera immediately from local input and use light presentation smoothing for replicated position if needed. Keep authoritative eye position separate; avoid double interpolation or moving the physics root locally.
+- [x] **PLY-06** Store the latest accepted input and server receipt time per player. After 0.25 seconds without fresh input, set movement/interact/gaze intent inactive. Ensure idle players still send heartbeats so valid gaze is not expired accidentally.
+- [x] **PLY-07** Implement server-only CharacterController movement at the agreed simulation rate. Apply base 5 m/s speed, normalized movement relative to accepted yaw, gravity, and collision. Never run the same simulation on both host client and host server paths.
+- [x] **PLY-08** Set up physics layers so players collide with solid world geometry but do not push/block one another. Keep target colliders eligible for gaze queries despite the movement collision matrix.
+- [x] **PLY-09** Replicate root position/yaw through server-authoritative NetworkTransform. Confirm its installed-version authority setting in the Inspector or supported override, rather than relying on an unrelated tutorial's component.
+- [x] **PLY-10** Rotate the owner camera immediately from local input and use light presentation smoothing for replicated position if needed. Keep authoritative eye position separate; avoid double interpolation or moving the physics root locally.
 - [ ] **PLY-11** Replicate accepted aim pitch only if used by remote head/body feedback. Disable unused transform axes such as scale. Ensure mouse pitch never tilts the collision capsule.
 - [ ] **PLY-12** Implement phase input gating. Lobby/countdown/results disable gameplay; a local menu releases input while allowing the network heartbeat and session to continue. Closing the menu requires current input, not a stale held E.
 - [ ] **PLY-13** Add team spawn lookup and server teleport/reset. Temporarily handle CharacterController teleport constraints correctly; clear cached velocity/input and presentation interpolation where the package requires it.

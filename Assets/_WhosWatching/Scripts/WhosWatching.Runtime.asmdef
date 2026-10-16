@@ -1,0 +1,1 @@
+{"name":"WhosWatching.Runtime","rootNamespace":"WhosWatching","references":["Unity.Netcode.Runtime","Unity.InputSystem","Unity.Networking.Transport"]}
