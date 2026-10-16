@@ -1,42 +1,31 @@
-# Project handoff
+# Project handoff — 2026-10-16
 
-## Objective and current step — 2026-10-16
-Create the Unity URP project in this repository, provide a multiplayer implementation runbook, and begin networking/tests while art is supplied later. **Initial LAN development foundation is implemented and tested on one PC.** Full game implementation remains pending. User approved Unity 6000.3.23f1 instead of requested 6000.3.24f1. Quota was recovered and checked above reserve during this continuation.
+## Current objective and status
+Screen-wide multiplayer gaze is implemented and validated in the development arena. Every visible player can receive gaze simultaneously; all incoming ally and enemy contributions are summed before configurable limits. Unity remains 6000.3.23f1. Working tree changes are uncommitted on baseline bb534cf; nothing pushed. This is not the full objective-round game.
 
 ## Completed
-- Repository-root Unity project: Assets/, Packages/, ProjectSettings/; editor/revision pin, generated package lock, visible meta files/text serialization, URP, Windows target and product name.
-- Pinned NGO 2.13.1, Transport 2.7.4, URP 17.3.0, Input System 1.20.0. No cloud/service startup dependency.
-- Assets/_WhosWatching/Scenes/Main.unity and Prefabs/Player/NetworkPlayer.prefab: registered network player, authoritative NetworkTransform/CharacterController, owner camera, fixed anchors, primitive visuals; floor/cover/walls and menu camera.
-- Scripts/Multiplayer/NetworkGameManager.cs: direct host/join/cancel/leave, IPv4/port validation, protocol token, four-slot cap with pending reservation handling, callbacks and timeout. Session always represents a development lobby.
-- Scripts/Player/NetworkPlayer.cs: owner-only input/camera, validated unreliable owner RPC, sequence/rate/finite checks, server movement at 30 Hz, 20 Hz input, 0.25-second freshness policy and out-of-bounds recovery. Player/player movement collision disabled.
-- SessionRules and 13 EditMode tests. SmokeProbe is explicitly opt-in and development-only.
-- Tools/Unity.ps1 and Tools/Smoke.ps1 provide repeatable tests/build/process checks. Multiplayer Setup.md, README.md, Docs/Decisions.md and Docs/TestLog.md describe setup, contracts, next milestones and evidence.
-- Plan/Todo status synchronized conservatively. No full implementation gate claimed. No Git commit or push performed.
+- Scripts under Assets/_WhosWatching/Scripts/Gaze/: rectangular camera-frustum checks, validated owner viewport aspect, host-controlled FOV, 15 m default range, independent observer-target acquisition (0.15 s), and occlusion checks at fixed body samples.
+- Dedicated GazeBody capsule in Prefabs/Player/NetworkPlayer.prefab on GazeTarget layer 9; no physical collisions. Avoids CharacterController ray-query shrinkage. World and other gaze bodies block visibility; cosmetics do not expand gameplay visibility.
+- Multi-target replicated state/HUD, additive positive/negative movement and work effects, independent target release, stale/menu suppression and disconnect cleanup. Existing server movement/work authority retained.
+- Unity Inspector configuration: Assets > _WhosWatching > Settings > GazeConfig. Edit Per-observer contributions and Stacking limits > Minimum/Maximum. Defaults +35% ally, -25% enemy, 0.50–1.50 final multiplier. Maximum 2.05 allows three full +35% contributions. Save outside Play mode and rebuild peers.
+- Protocol whos-watching/lan/3-screen-gaze; all peers must rebuild together. Main Networking/GazeSystem references the config asset. ProjectSetup.InstallGaze migrates existing prefab/scene; Create is for initial creation only.
+- README.md, Multiplayer Setup.md, Plan.md, Todo.md and Docs/Decisions.md describe current rules and tuning. Tools/ScreenGazeSmoke.ps1 and ScreenGazeProbe.cs add 18 reproducible network scenarios.
 
-## Validation
-- Initial import and scene-generation batch runs completed successfully.
-- All 13 EditMode tests passed.
-- Windows development build and final incremental rebuild succeeded.
-- Two-process and four-process loopback tests passed on one Windows PC: population, authoritative movement replication and stale stop on every participant.
-- Fifth client rejected at capacity; invalid protocol rejected in both topologies. No runtime exception/error markers in smoke logs.
-- Unity generated asset metadata; file metadata check found no omissions. Library, Logs, Builds and UserSettings are ignored.
-- Detailed limits and reproduction: Docs/TestLog.md. Baseline revision c85c8b4 plus current uncommitted changes. No committed known-good game revision yet.
+## Validation actually run
+- Initial four-peer screen suite failed partial-head visibility (17/18 stages); investigation reproduced CharacterController query mismatch. Dedicated GazeBody collider corrected it.
+- After correction: 30/30 EditMode tests passed, including viewport edges/aspect, body visibility/occlusion, independent acquisition and configurable additive bounds.
+- Final Windows development build succeeded.
+- Final Tools/ScreenGazeSmoke.ps1 -Players 4: all 18 stages passed on all four peers (262143/262143), including off-center/all-target effects, mixed stacking, partial visibility, walls, intervening body, invalid aspect, range, stale/menu input and disconnect cleanup.
+- Final Tools/GazeSmoke.ps1 -Players 2: all ten stages passed on both peers (1023), work=True and movement=3. Actual movement and server work checked.
+- Asset file metadata present. Build/log output is ignored locally in Builds/Windows and Logs. Detailed evidence/limitations: Docs/TestLog.md.
 
-## Partial work and decisions
-- This is a movement test lobby, **not full 1v1/2v2 matches**. Teams/readiness, match phases/round IDs, gaze, work, scores/results and rematch are not implemented.
-- Input uses temporary direct Input System device polling and IMGUI. Planned input action asset and Canvas UI remain to do.
-- Leave/retry reuses a stopped NetworkManager instead of reloading Main. Full recovery acceptance is outstanding; see Docs/Decisions.md.
-- Keep art under VisualRoot; preserve physics/network root and eye/chest anchors. Use primitive geometry until art arrives.
-- ProjectSetup.Create refuses to overwrite existing Main; do not delete/regenerate scene/prefabs to hide integration issues.
+## Limits and next actions
+1. Recheck account quota before further work; preserve the user's 10% reserve and existing changes.
+2. Open Main and manually inspect the new HUD and screen-edge behavior, then test matching builds on separate PCs. Current automated runs are headless loopback processes on one PC with synthetic input. User confirmation applied to the prior gaze build, not this revision.
+3. Visibility uses fixed standard-body samples, not rendered pixels. Very thin visible slivers may miss; art must stay under visual children and preserve the controller/network root and GazeBody.
+4. Continue lifecycle acceptance: cancel/timeout/retry, Leave/rehost/rejoin, host loss. Production input actions, readiness/lobby, round IDs/phase gates, objectives/results/rematch remain planned work. E work is a test harness.
+5. Exact work completion timings, injected network impairment, a clean clone on another machine and Unity 6000.3.24f1 upgrade remain untested. No full production gate signoff claimed.
+6. Commit intended source/assets/settings/docs only when requested; do not commit Library, Builds, Logs or UserSettings.
 
-## Exact next actions
-1. Recheck quota and review Git status. Open repository root with 6000.3.23f1, open Main and play. Use README commands for repeatable builds/tests.
-2. Manually test rendered scene, mouse capture/Escape, independent controls, collisions and audio listeners. Test a second PC over LAN with both host roles; record actual firewall/network results.
-3. Add lifecycle tests for cancel/timeout/retry, Leave/rehost/rejoin and host crash. Verify slot cleanup and usable UI, then complete NET tasks based on evidence.
-4. Introduce explicit input snapshots including round ID/input-enabled/interact/objective flags, Input Actions, team spawns and production phase gating. Keep server authority and stale-input behavior.
-5. Implement Plan's gaze/LOS/lock and bounded effect aggregation, with pure tests and development work harness. Prove G2 before cosmetic/polish work.
-6. Continue objectives, match lifecycle, real lobby/team/readiness, UI and art integration via Multiplayer Setup.md. Assign human scene/prefab owners and obtain clean-clone reproduction.
-7. Update handoff and test evidence at each milestone. Commit only intended source/assets/settings/docs; no caches/builds/raw private logs.
-
-## Pending operations and blockers
-No background operations remain. No implementation blocker. Real separate-PC LAN and user-facing visual/input checks require suitable interactive testing/hardware. 24f1 compatibility is untested. Local build output exists under Builds/Windows and is intentionally ignored. The user has not requested a commit or push.
+## Pending operations
+None. No known blocking compile/runtime failure after the fixes. Current requested screen-gaze/stacking implementation is complete; manual visual and real-LAN acceptance remain outstanding.

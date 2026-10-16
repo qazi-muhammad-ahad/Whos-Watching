@@ -11,6 +11,7 @@ namespace WhosWatching
     {
         public NetworkManager Network;
         public Camera MenuCamera;
+        public GazeSystem Gaze;
         public string Status = "Offline";
         string address = "127.0.0.1", port = "7777";
         readonly Dictionary<ulong, double> reservations = new();
@@ -21,6 +22,7 @@ namespace WhosWatching
         void Awake()
         {
             Instance = this;
+            if (!Gaze) Gaze = GetComponent<GazeSystem>();
             Application.runInBackground = true;
             Time.fixedDeltaTime = 1f / 30;
             Network.ConnectionApprovalCallback += Approve;
@@ -64,7 +66,7 @@ namespace WhosWatching
         void Connected(ulong id)
         {
             reservations.Remove(id);
-            if (id == Network.LocalClientId) { connecting = false; Status = "Connected — movement test lobby"; }
+            if (id == Network.LocalClientId) { connecting = false; Status = "Connected — gaze test arena"; }
             Debug.Log($"WW_CONNECTED id={id}");
         }
         void Disconnected(ulong id)
@@ -113,7 +115,7 @@ namespace WhosWatching
         }
         void OnGUI()
         {
-            GUILayout.BeginArea(new Rect(12, 12, 370, 260), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(12, 12, 370, 340), GUI.skin.box);
             GUILayout.Label("Who's Watching? — LAN development harness");
             GUILayout.Label(Status);
             if (!Network.IsListening && !connecting && !stopping)
@@ -125,7 +127,19 @@ namespace WhosWatching
             }
             else if (GUILayout.Button(connecting ? "Cancel" : "Leave")) Stop();
             GUILayout.Label("WASD move • click arena to capture mouse • Esc releases");
-            GUILayout.Label("Movement enabled in this test lobby. Gaze/matches pending.");
+            GUILayout.Label("All visible players receive gaze; walls block it.");
+            if (Gaze && Network.IsConnectedClient)
+            {
+                foreach (var p in Gaze.Players)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label($"Player {p.OwnerClientId}: Team {p.Team.Value}");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    if (Network.IsServer && GUILayout.Button("Switch team (test)")) Gaze.SetTeam(p, p.Team.Value == TeamId.A ? TeamId.B : TeamId.A);
+#endif
+                    GUILayout.EndHorizontal();
+                }
+            }
             GUILayout.EndArea();
         }
     }

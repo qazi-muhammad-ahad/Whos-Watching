@@ -39,7 +39,7 @@ These are recommendations to playtest, not extra requirements from the original 
 | Mode | Race to finish three sequential team-owned stations | One objective implementation produces a complete round |
 | Arena | One mirrored arena with six station placements, cover, and cross-sightlines | Supports support, disruption, and repositioning |
 | Round duration | 180 seconds initially | Prevents sessions without an ending |
-| Gaze | Automatic while looking; one outgoing target per player | No extra ability button or targeting menu |
+| Gaze | Automatic for all visible players in the camera view | No extra ability button or targeting menu |
 | Effects | Short acquisition delay, bounded additive stacking, immediate release on next server evaluation | Predictable and easy to debug |
 | Interaction | Hold E while within range and unobstructed | Familiar, low-cost objective mechanic |
 | Persistence | Settings and preferred cosmetic only, stored locally | No accounts or inventory needed for LAN |
@@ -108,7 +108,7 @@ Direct LAN means players can reach the host's local address on the same network.
 | Movement | Submit direction; display replicated motion | Run CharacterController, gravity, speed modifiers, and bounds reset | Server-authoritative NetworkTransform |
 | Aim | Submit yaw/pitch | Normalize yaw, clamp pitch, reject invalid/stale input | Accepted body yaw and aim pitch for presentation |
 | Teams/ready/colors/cosmetics | Request changes in lobby | Validate slots, IDs, phase, and authority | Server-written state |
-| Gaze | Optional candidate preview | Select target, validate LOS/lock, calculate effects | Confirmed target plus incoming counts/multipliers |
+| Gaze | Optional candidate preview | Validate all visible targets and independent locks; sum effects | Confirmed target IDs plus incoming/outgoing counts and multipliers |
 | Objectives | Request/refresh held interaction | Validate target, range, LOS, phase, worker, and advance progress | Progress, completion, worker |
 | Match/timer/results | Draw current state | Own state machine, clock deadlines, scores, winner, reset | Phase, deadlines, scores, result |
 | UI/audio/particles | Render from accepted state | No per-frame presentation decisions | Occasional meaningful events only |
@@ -146,33 +146,34 @@ Spawn points belong to teams and use separate positions for each teammate. Playe
 
 ## 8. Core gaze-system design
 
-### 8.1 Recommended targeting rules
+### 8.1 Screen-wide gaze rules (user revision, 16 October 2026)
 
 | Parameter | Initial value | Inspector control |
 | --- | --- | --- |
-| Maximum gaze range | 15 m | `GazeConfig.MaxDistance` |
-| Cone half-angle | 8 degrees from accepted aim forward; 16-degree full cone | `GazeConfig.HalfAngleDegrees` |
-| Acquisition time | 0.15 s of continuous validity | `GazeConfig.LockSeconds` |
+| Maximum gaze range | 15 m from eye to body sample | `GazeConfig.Range` |
+| Vertical camera FOV | 60 degrees, synchronized from host | `GazeConfig.VerticalFieldOfView` |
+| Horizontal camera coverage | Derived from each owner's validated viewport aspect | Owner camera aspect, bounded 0.25–4 |
+| Acquisition time | 0.15 s per observer-target pair | `GazeConfig.LockSeconds` |
 | Server gaze evaluations | 20 Hz | `GazeConfig.EvaluationsPerSecond` |
-| Outgoing targets | Exactly zero or one | Fixed MVP rule |
-| Release | First evaluation finding invalid LOS, aim, range, or player state | No gameplay fade/grace |
-| Target anchor | Consistent upper-chest anchor on the standard body | Prefab reference |
+| Outgoing targets | ALL visible players simultaneously, up to three | Four-player admission cap |
+| Release | First invalid screen/LOS/range/input evaluation for that pair | No retained effect while reacquiring |
+| Visibility shape | Fixed samples across the standard gameplay capsule, including head and sides | `GazeVisibility`, independent of imported cosmetics |
 
-The gameplay cone is not the Camera's visual field of view. The HUD reticle should communicate the narrower targeting tolerance. Looking toward a visible chest within the cone qualifies; seeing only a hat or a tiny limb does not. All characters use the same anchors and collision size, including cosmetic variants.
+The user replaced the narrow aiming cone and single-target selection with the camera screen. The crosshair is not required to overlap a player. A visible standard-body sample qualifies, including a visible head when the chest is covered. Samples approximate body visibility; this is not a GPU pixel-visibility query and extremely thin slivers between samples may not qualify. Decorative hats do not enlarge the gameplay body. Gaze still requires range and actual line of sight; it does not pass through walls.
 
 ### 8.2 Host evaluation algorithm
 
-1. Skip observers outside Playing, disconnected/despawned players, stale input, or players whose menu suppresses input. Clear their outgoing state.
-2. Reconstruct the observer's eye position from its server character transform and fixed anchor; construct forward from accepted yaw/pitch. Never accept a camera world position from the client.
-3. Iterate the at-most-three other players. Reject self, missing/invalid targets, targets beyond range, and targets outside the cone using a dot-product threshold.
-4. Cast from the observer's eye to the candidate's chest. Query solid-world and player-body layers, ignore triggers and observer-owned colliders, and use the nearest remaining hit. The first blocker must belong to the candidate. Another player's body blocks gaze to somebody behind them; decorative hats and particles never block it.
-5. If a non-allocating multi-hit query is used, sort/select hits by distance explicitly; returned ordering is not assumed. Buffer saturation must fail closed or retry with a larger buffer, never imply visibility. For four players, a simple correctly filtered query is preferable to complex optimization.
-6. Select the visible candidate with the smallest angular error, then distance, then stable player identity to break ties. Candidate switches reset acquisition.
-7. Require continuous qualification for 0.15 seconds of server time. If validity breaks, clear the old confirmed target immediately and reset acquisition. There is no retained buff while locking onto a new target.
-8. Build the complete set of confirmed directed gaze relationships for this evaluation. Aggregate all targets' effects only after all observers are evaluated, avoiding order-dependent stacking.
-9. Replicate changes in confirmed targets and effects. Clients may preview candidates but label effects as active only after host confirmation.
+1. Skip disconnected/despawned, stale, menu-suppressed or ineligible observers. Production phase gating remains required when match state is implemented; the development arena deliberately enables gameplay.
+2. Reconstruct eye/rotation from the server character and accepted yaw/pitch. The server owns camera vertical FOV and replicates it to owner cameras. Owner input reports finite viewport aspect bounded to 0.25–4; the local projection uses the same bounds. Never use the host window size for remote observers or accept client world camera positions.
+3. Iterate every other valid player. Test fixed body samples against the rectangular horizontal/vertical frustum, near plane and range. Behind-camera and off-screen samples cannot qualify.
+4. Raycast only qualifying samples. Ignore triggers and source colliders, select the nearest remaining hit and require it to belong to the target. The SAME sample must satisfy both viewport and LOS. World geometry and intervening player bodies block it; decorative layers do not.
+5. Maintain a separate acquisition timer for each observer-target pair. Seeing a new player does not reset a previously confirmed one; losing one does not remove unrelated effects. One observer contributes at most once per target, regardless of how many samples are visible.
+6. Collect every confirmed directed relationship, then sum incoming ally/enemy counts. Apply `clamp(1 + support*allies - disruption*enemies, minimum, maximum)` only after summing positive and negative contributions. Never cap the positive subtotal first or compound prior-frame speed.
+7. Replicate all confirmed target IDs, outgoing support/disruption counts, incoming counts and final movement/work modifiers. HUD displays simultaneous support and disruption; a client preview never owns gameplay effects.
 
-Do not use a broad sphere cast that can pass around a wall edge. A single chest anchor plus real obstruction ray is a deliberate, explainable compromise. If it feels too strict, first tune angle, range, and map cover; do not remove LOS validation. A second anchor is a later tuning option only if every accepted anchor still has a real clear ray.
+Current state stores three outgoing IDs because sessions admit four players. Supporting more players later requires updating this capacity and tests. Aspect validation bounds the claim but does not prove a hostile client's physical monitor size; this remains a trusted-host LAN prototype.
+
+Inspector tuning: select `Assets/_WhosWatching/Settings/GazeConfig.asset`. **Per-observer contributions** changes each positive/negative movement/work amount; **Stacking limits** changes Minimum/Maximum after the sum. Defaults are 0.50–1.50, but Maximum can be raised (e.g. 2.05 for three +35% allies). The host configuration is authoritative; edit the asset outside Play mode for intentional persistent settings and rebuild all peers for distribution.
 
 ### 8.3 Visibility boundaries and expected delay
 
@@ -391,7 +392,7 @@ The shared contracts to agree before parallel coding are `TeamId`, `MatchPhase`,
 | Statistics | Host | Results snapshot; no per-frame HUD replication required |
 | Reticle, UI layout, camera effects, cosmetic particles, audio playback | Local | No continuous network updates |
 
-At four players there are at most 12 directed observer-target pairs per evaluation, or 240 candidate evaluations/second at 20 Hz before range/cone rejection. This small bounded workload does not need spatial partitioning or jobs. Count actual casts and messages in a development overlay before optimizing.
+At four players there are at most 12 directed observer-target pairs per evaluation, or 240 candidate evaluations/second at 20 Hz before range/frustum/sample rejection. This small bounded workload does not need spatial partitioning or jobs. Count actual casts and messages in a development overlay before optimizing.
 
 Keep server progress separate from quantized or throttled presentation snapshots. Do not stream strings or full catalogs continuously. Store shared configuration in matching builds and check build/protocol identity; copy selected configuration into round state on the host, freeze it during play, and replicate the actual modifiers used by clients. Client-local Inspector edits never change host rules.
 
@@ -476,7 +477,7 @@ Record build/commit, machines/process count, host, scenario, reproduction steps,
 | Risk / trigger | Smallest practical response | What must remain |
 | --- | --- | --- |
 | Networking gate missed by H6 | Pair A/B on minimal host/client prefab; remove presentation dependencies; cut all stretch work | Two/four-player host-client foundation |
-| Ally/enemy gaze unreliable by H12 | Use one chest anchor, flat arena, fixed configs, debug rays; reduce visual complexity | Both effect signs, real LOS, host validation |
+| Ally/enemy gaze unreliable by H12 | Use standard body samples, flat arena, fixed configs and debug rays; reduce visual complexity | Both effect signs, real LOS, host validation |
 | Server movement feels slow | Check send/tick settings and presentation smoothing on LAN; keep movement simple | Server owns gameplay speed; do not silently switch authority |
 | Team inexperienced with chosen package | Verify a small official example against pinned package; keep one API style | Working compatible stack; no last-minute framework migration |
 | Several objective types unfinished | Ship only hold stations and reuse the same prefab | Complete objective race and gaze interaction |

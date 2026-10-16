@@ -1,29 +1,46 @@
 # Who's Watching?
 
-Unity 6.3 URP multiplayer prototype. The current deliverable is a **development LAN movement harness**, with primitive art. Gaze, team readiness, objectives and full matches are the next milestones.
+Unity 6.3 URP multiplayer gaze prototype. Host/join, server movement, ally support, enemy disruption, wall blocking, team colors and gaze feedback are implemented with primitive art. Objective rounds and production lobby readiness remain future milestones.
 
-## Open
+## Open and play
 
-Install **Unity 6000.3.23f1** with Windows build support. Add this repository root in Unity Hub, allow package import, and open `Assets/_WhosWatching/Scenes/Main.unity`. Press Play. The project pins NGO 2.13.1, Transport 2.7.4, URP 17.3.0 and Input System 1.20.0. Commit the package lock and all asset metadata with changes.
+Install Unity **6000.3.23f1** with Windows build support, add this repository root in Unity Hub, and open `Assets/_WhosWatching/Scenes/Main.unity`. Allow package import before Play.
 
-## Try multiplayer
+1. Host LAN in one instance and Join LAN in another. Use `127.0.0.1` on one PC, or the host local IPv4 on the same LAN. UDP port is 7777; maximum four players including host.
+2. Click the arena to the right of the menu to capture mouse. WASD moves, mouse aims, Escape releases and suspends outgoing gameplay intent. Leave ends your session.
+3. Keep players anywhere in your camera view for 0.15 seconds: **all visible players count simultaneously**, within the configured 15 m range. You do not have to aim at their chest. Walls and intervening bodies block gaze; a visible head or body side can qualify.
+4. Each target receives the sum of all incoming gaze: `1 + 0.35 × allied observers - 0.25 × enemy observers`, then the configured limits apply (defaults 0.50x–1.50x). One ally plus two enemies gives 0.85x; two allies plus one enemy gives 1.45x. The HUD shows every confirmed target, outgoing support/disruption, incoming counts and resulting movement/work multipliers. Team A is cyan; B is orange. Host development buttons switch teams for testing.
+5. Hold E for the five-second work test. Gaze changes its actual progress rate; this is a development harness, not the final station objectives.
 
-- Run Host LAN in one instance and Join LAN in another. Use `127.0.0.1` on the same PC or the host's local IPv4 on the same LAN. UDP port defaults to 7777; host binds all interfaces.
-- Click the arena to the right of the menu to capture the mouse. WASD moves; mouse looks; Escape releases the mouse; Leave ends the session.
-- Maximum four players including host. Movement is enabled in this test lobby. There are no playable teams, gaze effects or objective rounds yet.
-- A separate-PC test may require allowing the executable on the intended private network. Direct Internet connectivity is not promised.
+All peers must use this new build (protocol `3-screen-gaze`). Old movement-only builds are rejected. Direct Internet NAT traversal is not included. Separate-PC LAN may require allowing the application on the intended private network.
 
 ## Build and test
 
-From PowerShell at the repository root, set `$unityEditor` to the installed `Unity.exe`, then run:
+Close this project in Unity before batch commands. Set `$unityEditor` to the installed Unity.exe, then run from the repository root:
 
 ```powershell
 ./Tools/Unity.ps1 -UnityEditor $unityEditor -Action Test
 ./Tools/Unity.ps1 -UnityEditor $unityEditor -Action Build
 ./Tools/Smoke.ps1 -Players 2
 ./Tools/Smoke.ps1 -Players 4
+./Tools/GazeSmoke.ps1 -Players 2
+./Tools/GazeSmoke.ps1 -Players 4
+./Tools/ScreenGazeSmoke.ps1 -Players 2
+./Tools/ScreenGazeSmoke.ps1 -Players 4
 ```
 
-Close the project in Unity before batch commands. The Windows development executable is `Builds/Windows/WhosWatching.exe`; distribute its whole folder, not only the executable. Builds and local logs are ignored by Git. Smoke tests are headless, same-PC process tests; they do not certify graphics or separate-PC LAN.
+Run process suites sequentially; each host uses port 7777. The Windows development player is `Builds/Windows/WhosWatching.exe`; distribute the whole associated folder. Logs/builds are ignored by Git. Headless process tests do not certify graphics or separate-PC LAN.
 
-Read [Multiplayer Setup.md](Multiplayer%20Setup.md) for the implementation roadmap, [Docs/TestLog.md](Docs/TestLog.md) for measured results, and [progression.md](progression.md) for exact next steps. [Plan.md](Plan.md) and [Todo.md](Todo.md) describe the full intended game, not the current implemented scope.
+Tune gaze in `Assets/_WhosWatching/Settings/GazeConfig.asset`. Artists replace visual children while preserving network roots, collision and anchors. See [Multiplayer Setup.md](Multiplayer%20Setup.md), [Docs/TestLog.md](Docs/TestLog.md), [progression.md](progression.md), [Plan.md](Plan.md) and [Todo.md](Todo.md).
+
+## Change gaze and stacking values in Unity
+
+In the **Project** window, open **Assets > _WhosWatching > Settings** and select **GazeConfig**. In the **Inspector**:
+
+- **Stacking limits > Minimum / Maximum**: final movement/work multiplier limits after all positive and negative contributions are summed. Default 0.50 / 1.50. Set Maximum to 2.05 or higher to allow three full +35% ally bonuses; lower Minimum if you want stronger combined slowdowns.
+- **Per-observer contributions > Move Support / Move Disruption / Work Support / Work Disruption**: each observer contribution (0.35 means 35%; disruption is a positive amount to subtract).
+- **Screen visibility > Vertical Field Of View / Range / Lock Seconds**: camera coverage, maximum distance and acquisition delay. The host owns FOV; each client supplies its bounded viewport aspect ratio, so window resizing changes horizontal coverage.
+
+For persistent settings, stop Play mode, edit and save this asset, then rebuild for standalone testing. The same asset is referenced by **Main > Networking > Gaze System > Config**. Host settings are authoritative. Do not change movement colliders to tune visibility: the separate **GazeBody** collider on the **GazeTarget** layer handles gaze and has no movement collisions.
+
+Visibility uses samples on a standard body, not rendered pixels. Extremely thin visible slivers between samples may not qualify; hats never enlarge the gameplay visibility shape. The fixed-body approach keeps later imported art from changing gameplay.

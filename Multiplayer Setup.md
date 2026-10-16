@@ -6,7 +6,7 @@ Implementation roadmap and continuation handoff for the Unity 3D URP project at 
 
 Use **Unity 6000.3.23f1**, explicitly approved by the user. The requested 6000.3.24f1 is a future patch upgrade requiring verification. Editor and URP version numbers differ. Target Windows, keyboard/mouse, direct LAN, player-hosted server, 1v1 and 2v2, maximum four including host. No Relay/cloud login during the baseline.
 
-The repository now contains a saved Main scene, registered primitive player prefab, resolved networking packages, host/join controls, server movement and EditMode tests. This is a development movement lobby; production teams, phase gating, gaze and objectives remain pending. The scene generator is an initial-creation utility and refuses to overwrite Main.
+The repository now contains a saved Main scene, registered primitive player prefab, resolved networking packages, host/join controls, server movement and EditMode tests. This is a development movement lobby; basic teams and gaze are implemented; production readiness, phase gating and objectives remain pending. The scene generator is an initial-creation utility and refuses to overwrite Main.
 
 ## 1. Finish the project baseline — SET
 
@@ -37,10 +37,11 @@ The repository now contains a saved Main scene, registered primitive player pref
 
 ## 4. Gaze vertical slice — GAZ/EFF
 
-Use 15 m range, 8 degree cone half-angle, 0.15 second lock and 20 Hz server evaluations. Aim uses server eye and accepted angles, targeting fixed chest anchors. Select by angle, then distance, then stable ID. Raycast through world/player layers; ignore triggers/source colliders and require the nearest remaining hit to be the target. Intervening players block; cosmetics do not.
+Use the full rectangular camera viewport, server-owned vertical FOV (default 60 degrees), validated owner aspect, 15 m range, 0.15 second independent pair lock and 20 Hz server evaluation. Affect ALL visible players simultaneously. Fixed body samples must be both inside the viewport and unobstructed. World and GazeTarget layers block rays; source colliders/triggers/cosmetics do not. The dedicated GazeBody capsule matches the standard visible body and is excluded from physical collisions; do not use the movement CharacterController query shape for visibility.
 
-Reset lock on switch/invalidity and clear confirmed effects at the next failed evaluation. Aggregate all observers before applying effects. Both initial multipliers are clamp(1 + 0.35*allies - 0.25*enemies, 0.50, 1.50). Recompute from base, never compound prior-frame speed. Replicate confirmed target presence/ID and incoming counts/multipliers.
+Maintain separate timers per observer-target pair. Release invalid pairs without restarting unrelated targets. Sum every incoming ally/enemy once per target, then apply configurable final bounds: `clamp(1 + support*allies - disruption*enemies, Minimum, Maximum)`. Replicate all outgoing IDs/counts and incoming counts/multipliers. Support and disruption can occur simultaneously in both directions.
 
+Unity tuning: Project window > Assets > _WhosWatching > Settings > GazeConfig. Inspector sections **Per-observer contributions** and **Stacking limits** control the individual amounts and final bounds. Defaults remain 0.35/0.25 and 0.50–1.50; users can change them. Stop Play mode, save settings and rebuild for distribution. Main > Networking > Gaze System references this asset.
 Use a development-only team override and five-second work harness. Verify allies, enemies, mixed stacks, walls, corners, switching, stale input, disconnect and reset before content work. G2 requires actual networked movement/work effects.
 
 ## 5. Complete the match — LOB/OBJ/MAT
@@ -76,4 +77,12 @@ Upgrade to 6000.3.24f1 on a branch after preserving the baseline. Inspect serial
 
 Use the pinned package APIs: [NGO 2.13](https://docs.unity3d.com/Packages/com.unity.netcode.gameobjects@2.13/manual/index.html). Prefer its local Documentation~ over unrelated tutorial versions. Relay stays gated until G5 and tested LAN exists.
 
-After each milestone update progression.md and check only evidence-backed Todo tasks. Observe the account reserve before long runs. Next actions are interactive mouse/camera checks, separate-PC LAN and lifecycle acceptance, followed by the gaze slice. The initial host/client movement harness and two/four-process smoke tests pass; it is not yet the full game.
+After each milestone update progression.md and check only evidence-backed Todo tasks. Observe the account reserve before long runs. The gaze slice is now implemented. Next actions are interactive gaze playtests, separate-PC LAN and lifecycle acceptance, then objectives and round state. The initial host/client movement harness and two/four-process smoke tests pass; it is not yet the full game.
+
+## Implemented gaze workflow
+
+Open Main and host/join with the same new build. Capture mouse, keep players in the camera view and watch the confirmed HUD. Host development buttons can put two players on the same team. Hold E for the five-second work demonstration; use central cover to remove gaze. Escape disables outgoing intent. Inspector tuning lives in Assets/_WhosWatching/Settings/GazeConfig.asset. After rebuilding, run Tools/GazeSmoke.ps1 with -Players 2 or 4. See Docs/TestLog.md for evidence. This is the gaze milestone, not completed objective rounds.
+
+## Screen-wide rule change — implemented
+
+The user explicitly requested all visible players in an observer camera FOV/screen count simultaneously. This supersedes the narrow 8-degree, one-outgoing-target design. Implemented with independent pair locks, full viewport checks, standard-body LOS and multi-target HUD/state. Protocol is now 3-screen-gaze. Run Tools/ScreenGazeSmoke.ps1 after building; see Docs/TestLog.md and progression.md for actual validation results.

@@ -92,5 +92,36 @@ namespace WhosWatching.Editor
                 target = BuildTarget.StandaloneWindows64, options = BuildOptions.Development });
             if (report.summary.result != BuildResult.Succeeded) throw new System.Exception("Windows build failed: " + report.summary.result);
         }
+        public static void InstallGaze()
+        {
+            var tags = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
+            var layer = tags.FindProperty("layers").GetArrayElementAtIndex(9);
+            if (!string.IsNullOrEmpty(layer.stringValue) && layer.stringValue != "GazeTarget")
+                throw new System.InvalidOperationException("Layer 9 is occupied; choose a free gaze layer before migration.");
+            layer.stringValue = "GazeTarget"; tags.ApplyModifiedProperties();
+            for (int i = 0; i < 32; i++) Physics.IgnoreLayerCollision(9,i,true);
+            string prefabPath = Root + "Prefabs/Player/NetworkPlayer.prefab";
+            var contents = PrefabUtility.LoadPrefabContents(prefabPath);
+            try
+            {
+                var body = contents.transform.Find("GazeBody");
+                if (!body)
+                {
+                    body = new GameObject("GazeBody").transform; body.SetParent(contents.transform,false);
+                    var collider = body.gameObject.AddComponent<CapsuleCollider>(); collider.height = 2; collider.radius = 0.4f;
+                }
+                body.gameObject.layer = 9;
+                PrefabUtility.SaveAsPrefabAsset(contents,prefabPath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(contents); }
+            var scene = EditorSceneManager.OpenScene(Root + "Scenes/Main.unity");
+            var session = Object.FindFirstObjectByType<NetworkGameManager>();
+            var gaze = session.GetComponent<GazeSystem>();
+            if (!gaze) gaze = session.gameObject.AddComponent<GazeSystem>();
+            var config = AssetDatabase.LoadAssetAtPath<GazeConfig>(Root + "Settings/GazeConfig.asset");
+            if (!config) { config = ScriptableObject.CreateInstance<GazeConfig>(); AssetDatabase.CreateAsset(config, Root + "Settings/GazeConfig.asset"); }
+            gaze.Config = config; session.Gaze = gaze;
+            EditorSceneManager.MarkSceneDirty(scene); EditorSceneManager.SaveScene(scene); AssetDatabase.SaveAssets();
+        }
     }
 }

@@ -114,20 +114,20 @@ Sections are dependency groups, not a ban on parallel preparation. D can build t
 
 ## 03 — Implement host-validated gaze detection
 
-**Window:** H6–10. **Owner:** B; A reviews authority; D supplies blockers. **Priority:** P0. **Dependencies:** G1, accepted aim, team identity, eye/chest anchors. **Output:** deterministic single-target gaze with lock-on and real occlusion.
+**Window:** H6–10. **Owner:** B; A reviews authority; D supplies blockers. **Priority:** P0. **Dependencies:** G1, accepted aim, team identity, eye/chest anchors. **Output:** all-visible-player screen gaze with independent acquisition and real occlusion.
 
-- [ ] **GAZ-01** Add a temporary host-only debug team selector so two players can be allies or enemies without a complete lobby. Compile/gate it for development only and add a release removal check.
-- [ ] **GAZ-02** Add `GazeDetector` and a registry of valid spawned players. Read server position, accepted aim, phase, input freshness, and team IDs; never use the host's local Camera for every observer.
-- [ ] **GAZ-03** Schedule gaze evaluation at 20 Hz using server time. Keep acquisition timers independent of render FPS; process all observers before applying effects.
-- [ ] **GAZ-04** Add cheap self/invalid-player checks, squared-distance rejection at 15 m, and a dot-product cone check using an 8-degree half-angle. Expose all tuning values through GazeConfig.
-- [ ] **GAZ-05** Construct LOS rays from server eye to candidate chest. Include solid world/player body layers, ignore triggers and source-owned colliders, and require the nearest remaining hit to belong to that candidate.
-- [ ] **GAZ-06** Handle multiple collider hits explicitly: sort/select by distance; map child collider to owning player; never assume query result ordering. If a non-alloc buffer fills, retry safely or treat the view as blocked.
-- [ ] **GAZ-07** Exclude hats, particles, UI markers, and objective interaction triggers from gaze blockers. Keep actual station/environment solid geometry in the world blocker layer. Verify the gaze ray does not accidentally collide with its observer.
-- [ ] **GAZ-08** Choose one visible target by angular error, distance, then stable identity. Use the same selection policy for allies and enemies; do not secretly favor one team.
-- [ ] **GAZ-09** Track candidate ID and acquisition start time. Confirm only after 0.15 continuous seconds. Reset the timer on target switch, invalid aim, blocked LOS, stale input, or phase change.
-- [ ] **GAZ-10** On invalidity, clear the confirmed outgoing target at the current evaluation. Do not leave the previous effect active while acquiring a new target or while a visual icon fades.
-- [ ] **GAZ-11** Publish confirmed target presence/ID only when changed. Keep local candidate previews visually distinguishable from confirmed effects; do not let previews modify stats.
-- [ ] **GAZ-12** Add development gizmos for eye position, aim direction, cone/range, chest anchors, LOS hit, candidate, lock progress, and confirmed target. Rate-limit debug text/logs.
+- [x] **GAZ-01** Add a temporary host-only debug team selector so two players can be allies or enemies without a complete lobby. Compile/gate it for development only and add a release removal check.
+- [x] **GAZ-02** Add `GazeDetector` and a registry of valid spawned players. Read server position, accepted aim, phase, input freshness, and team IDs; never use the host's local Camera for every observer.
+- [x] **GAZ-03** Schedule gaze evaluation at 20 Hz using server time. Keep acquisition timers independent of render FPS; process all observers before applying effects.
+- [x] **GAZ-04** Reject self/invalid/out-of-range samples and test rectangular camera bounds using server FOV and validated owner aspect. Keep owner rendering and server projection consistent; expose FOV/range through GazeConfig.
+- [x] **GAZ-05** Construct LOS rays from server eye to on-screen fixed standard-body samples; the same sample must pass screen and LOS checks. Include solid world/player body layers, ignore triggers and source-owned colliders, and require the nearest remaining hit to belong to that candidate.
+- [x] **GAZ-06** Handle multiple collider hits explicitly: sort/select by distance; map child collider to owning player; never assume query result ordering. If a non-alloc buffer fills, retry safely or treat the view as blocked.
+- [x] **GAZ-07** Exclude hats, particles, UI markers, and objective interaction triggers from gaze blockers. Keep actual station/environment solid geometry in the world blocker layer. Verify the gaze ray does not accidentally collide with its observer.
+- [x] **GAZ-08** Confirm all visible players simultaneously, with the same visibility rules for allies/enemies. Count each observer-target pair once even when several body samples qualify.
+- [x] **GAZ-09** Track acquisition independently per observer-target pair. Confirm after 0.15 continuous seconds; clear only affected pairs on invalid visibility/stale input/despawn. Phase/reset cleanup remains required for production match state.
+- [x] **GAZ-10** On invalidity, clear the confirmed outgoing target at the current evaluation. Do not leave the previous effect active while acquiring a new target or while a visual icon fades.
+- [x] **GAZ-11** Publish all confirmed target IDs and outgoing support/disruption counts only when changed. Keep local candidate previews visually distinguishable from confirmed effects; do not let previews modify stats.
+- [ ] **GAZ-12** Add development gizmos for eye position, aim direction, frustum/range, body samples, LOS hit, candidate, lock progress, and confirmed target. Rate-limit debug text/logs.
 - [ ] **GAZ-13** Test angle/range boundaries, turning away, rapid target switching, a solid wall, a thin corner, a trigger, an intervening player, and an oversized cosmetic test mesh. Verify all outcomes match Plan section 8.
 - [ ] **GAZ-14** Test mutually looking players and two observers selecting the same target. Verify directionality: the looked-at player is affected, not automatically the observer.
 - [ ] **GAZ-15** Despawn/disconnect/reset a target and observer during acquisition and after confirmation. Remove stale references without exceptions or remaining relationships.
@@ -136,12 +136,12 @@ Sections are dependency groups, not a ban on parallel preparation. D can build t
 
 **Window:** H8–12. **Owner:** B; C consumes work modifier; E adds debug feedback. **Priority:** P0. **Dependencies:** confirmed gaze relationships. **Output:** gaze changes actual authoritative movement/work speed with bounded stacking.
 
-- [ ] **EFF-01** Implement a small pure calculation function taking allied/enemy observer counts and config. Default both multipliers to `clamp(1 + 0.35*A - 0.25*E, 0.50, 1.50)` with separate move/work coefficients available.
-- [ ] **EFF-02** Implement `GazeEffectController` to recompute incoming counts from the complete current relationship set. Count distinct observers once, reject self links, and never modify last frame's speed multiplicatively.
-- [ ] **EFF-03** Wire PlayerMotor to `BaseMoveSpeed * MoveMultiplier`. Remove any separate speed override in input/UI code. Document the intentional next-movement-step application after a gaze evaluation.
-- [ ] **EFF-04** Expose authoritative WorkMultiplier through a simple read-only player API for C. Create a temporary five-second hold bar harness to demonstrate speed effects before full objectives are ready.
+- [x] **EFF-01** Implement a small pure calculation function taking allied/enemy observer counts and config. Default both multipliers to `clamp(1 + 0.35*A - 0.25*E, 0.50, 1.50)` with separate move/work coefficients available.
+- [x] **EFF-02** Implement `GazeEffectController` to recompute incoming counts from the complete current relationship set. Count distinct observers once, reject self links, and never modify last frame's speed multiplicatively.
+- [x] **EFF-03** Wire PlayerMotor to `BaseMoveSpeed * MoveMultiplier`. Remove any separate speed override in input/UI code. Document the intentional next-movement-step application after a gaze evaluation.
+- [x] **EFF-04** Expose authoritative WorkMultiplier through a simple read-only player API for C. Create a temporary five-second hold bar harness to demonstrate speed effects before full objectives are ready.
 - [ ] **EFF-05** Replicate effect counts and effective multipliers from host only. Initialize owner/remote views on spawn and unsubscribe on despawn. Reset to 1.0 with zero counts outside Playing.
-- [ ] **EFF-06** Implement the minimum four feedback states: outgoing support, outgoing disruption, incoming support, incoming disruption. Show both incoming types together when mixed, plus the net multiplier.
+- [x] **EFF-06** Implement the minimum four feedback states: outgoing support, outgoing disruption, incoming support, incoming disruption. Show both incoming types together when mixed, plus the net multiplier.
 - [ ] **EFF-07** Add rule tests for no observers, one ally, one enemy, two enemies, one ally plus one enemy, one ally plus two enemies, duplicate observer prevention, and min/max clamps under synthetic counts.
 - [ ] **EFF-08** Measure the five-second harness at 1.00x, 1.35x, 0.75x, and 0.50x. Accept timing within simulation/network display tolerance; target theoretical durations are 5.00, 3.70, 6.67, and 10.00 seconds.
 - [ ] **EFF-09** Verify modifier removal after wall occlusion, turning away, disconnect, despawn, and reset. Confirm wall blocking removes gameplay effect at the next host evaluation even if remote UI arrives later.
@@ -413,7 +413,7 @@ Use these when a gate slips. They are conditional actions, not additional featur
 | Trigger | Immediate action | Keep working toward |
 | --- | --- | --- |
 | G1 missed | A/B pair on host/player/transport; D/E continue isolated graybox/UI; cut stretch work | Two connected moving players |
-| G2 missed | Freeze cosmetics/art, use one chest anchor/flat arena/debug rays, inspect authority and layers | Both gaze effects plus solid-wall rejection |
+| G2 missed | Freeze cosmetics/art, use standard body samples/flat arena/debug rays, inspect authority and layers | Both gaze effects plus solid-wall rejection |
 | G3 missed | Keep one hold objective prefab and one mode; remove extra task ideas | Full round, consistent result, reset |
 | G4 missed | Reduce art/UI complexity and fix population/teams/simultaneous gaze | Actual 2v2, not a mislabeled 1v1 build |
 | Cosmetics broken | Disable selector, default None for everyone | Readable team body colors and equal gameplay bodies |
