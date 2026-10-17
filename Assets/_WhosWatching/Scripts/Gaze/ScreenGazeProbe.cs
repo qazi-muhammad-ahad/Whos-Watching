@@ -15,6 +15,7 @@ namespace WhosWatching
         double deadline, began, stageStart, sendAt, finishAt;
         NetworkPlayer finishPlayer;
         GameObject wall;
+        static readonly Vector3 FixtureOffset = new(100,0,0);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
@@ -28,6 +29,11 @@ namespace WhosWatching
         }
         void Start()
         {
+            // Art now has real collision. Keep synthetic sightlines independent of map edits.
+            var floor=GameObject.CreatePrimitive(PrimitiveType.Cube);
+            floor.name="Screen gaze isolated test floor";
+            floor.transform.position=FixtureOffset+new Vector3(0,-0.5f,0);
+            floor.transform.localScale=new Vector3(40,1,40);
             deadline = Time.realtimeSinceStartupAsDouble + 85;
             NetworkGameManager.Instance.StartSession(role == "host");
         }
@@ -109,6 +115,7 @@ namespace WhosWatching
                 float height = stage == 13 ? 1.7f : 3;
                 wall.transform.position = new Vector3(0,height/2,-4); wall.transform.localScale = new Vector3(3,height,0.3f);
             }
+            wall.transform.position += FixtureOffset;
             for (int i=0; i<players.Length; i++)
             {
                 Vector3 position = new[] {new Vector3(0,1.05f,-7),new Vector3(-3,1.05f,-1),new Vector3(0,1.05f,1),new Vector3(3,1.05f,-1)}[i];
@@ -124,7 +131,7 @@ namespace WhosWatching
                     if (i == 1) position = new Vector3(0,1.05f,-4);
                     if (i == 2) position = new Vector3(0,1.05f,-1);
                 }
-                if (stage != 9) players[i].TestTeleport(position);
+                if (stage != 9) players[i].TestTeleport(position+FixtureOffset);
                 players[i].Team.Value = i == 0 || (i == 1 && stage != 2) || stage == 1 ? TeamId.A : TeamId.B;
             }
         }

@@ -1,1 +1,2 @@
-{"name":"WhosWatching.EditModeTests","references":["WhosWatching.Runtime"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"]}
+{"name":"WhosWatching.EditModeTests","references":["WhosWatching.Runtime","Unity.Netcode.Runtime"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"]}
+

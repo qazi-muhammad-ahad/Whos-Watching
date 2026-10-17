@@ -6,7 +6,7 @@ Implementation roadmap and continuation handoff for the Unity 3D URP project at 
 
 Use **Unity 6000.3.23f1**, explicitly approved by the user. The requested 6000.3.24f1 is a future patch upgrade requiring verification. Editor and URP version numbers differ. Target Windows, keyboard/mouse, direct LAN, player-hosted server, 1v1 and 2v2, maximum four including host. No Relay/cloud login during the baseline.
 
-The repository now contains a saved Main scene, registered primitive player prefab, resolved networking packages, host/join controls, server movement and EditMode tests. This is a development movement lobby; basic teams and gaze are implemented; production readiness, phase gating and objectives remain pending. The scene generator is an initial-creation utility and refuses to overwrite Main.
+The repository contains a saved Main scene, a common network player with selectable animated Devil/Ghost visuals, resolved networking packages, host/join controls, server movement and tests. A pre-game lobby now gates play on readiness and supports leader-selected team colors. Full objective rounds and mode selection remain pending. See [Team appearance](Docs/TeamAppearance.md). The scene generator is an initial-creation utility and refuses to overwrite Main.
 
 ## 1. Finish the project baseline — SET
 

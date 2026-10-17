@@ -4,6 +4,8 @@
 
 **Planning baseline:** 16 October 2026. Approximately five beginner-to-intermediate Unity developers; a possible 48-hour development window. A Unity URP LAN development harness now exists. This document describes the full target design; consult progression.md for actual implemented scope. Time estimates are targets and assume the team can install a common editor and test on separate PCs early.
 
+**User-directed appearance update, 17 October 2026:** pre-game Devil/Ghost selection and six individual leader-selected team colors supersede earlier cosmetic/color-pair assumptions. Ghost uses one dark main color across body and arms; Devil uses a dark body with lighter extremities/blush. See [Team appearance](Docs/TeamAppearance.md) for implemented behavior and remaining full-match scope.
+
 ## 1. Executive summary
 
 Who's Watching? is a small competitive multiplayer objective race where attention is a resource. Looking at a teammate makes that teammate faster; looking at an opponent makes that opponent slower. Players choose where to stand, which objective to advance, whom to support, and whom to obstruct with their gaze.

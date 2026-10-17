@@ -6,13 +6,15 @@ using UnityEngine;
 
 namespace WhosWatching
 {
-    // Development connectivity harness. Match/lobby readiness is the next milestone.
+    // LAN session and pre-game appearance lobby.
     public sealed class NetworkGameManager : MonoBehaviour
     {
         public NetworkManager Network;
         public Camera MenuCamera;
         public GazeSystem Gaze;
         public string Status = "Offline";
+        public CharacterId SelectedCharacter;
+        Vector2 lobbyScroll;
         string address = "127.0.0.1", port = "7777";
         readonly Dictionary<ulong, double> reservations = new();
         bool connecting, stopping;
@@ -45,7 +47,7 @@ namespace WhosWatching
             int occupied = Network.ConnectedClientsIds.Count;
             foreach (var id in reservations.Keys)
                 if (!Network.ConnectedClients.ContainsKey(id)) occupied++;
-            string rejection = SessionRules.Reject(request.Payload, occupied, true);
+            string rejection = SessionRules.Reject(request.Payload, occupied, !TeamLobby.Instance || !TeamLobby.Instance.IsSpawned || !TeamLobby.Instance.Playing.Value);
             response.Approved = rejection == null;
             response.CreatePlayerObject = response.Approved;
             response.Pending = false;
@@ -66,7 +68,7 @@ namespace WhosWatching
         void Connected(ulong id)
         {
             reservations.Remove(id);
-            if (id == Network.LocalClientId) { connecting = false; Status = "Connected — gaze test arena"; }
+            if (id == Network.LocalClientId) { connecting = false; Status = "Connected — choose your character and ready up"; }
             Debug.Log($"WW_CONNECTED id={id}");
         }
         void Disconnected(ulong id)
@@ -111,36 +113,94 @@ namespace WhosWatching
             if (connecting && Time.realtimeSinceStartupAsDouble >= deadline) { Status = "Connection timed out."; Stop(false); }
             if (stopping && !Network.IsListening && !Network.ShutdownInProgress)
             { stopping = false; reservations.Clear(); }
-            if (MenuCamera) MenuCamera.gameObject.SetActive(!Network.IsConnectedClient);
+            if (MenuCamera) MenuCamera.gameObject.SetActive(!Network.IsConnectedClient || !TeamLobby.GameplayAllowed);
+            var local = Network.LocalClient?.PlayerObject?.GetComponent<NetworkPlayer>();
+            if (local && local.View) local.View.gameObject.SetActive(TeamLobby.GameplayAllowed);
         }
         void OnGUI()
         {
-            GUILayout.BeginArea(new Rect(12, 12, 370, 340), GUI.skin.box);
-            GUILayout.Label("Who's Watching? — LAN development harness");
+            GUILayout.BeginArea(new Rect(12, 12, 380, Mathf.Min(Screen.height - 24, 720)), GUI.skin.box);
+            lobbyScroll = GUILayout.BeginScrollView(lobbyScroll);
+            GUILayout.Label("WHO'S WATCHING?  /  TEAM LOBBY");
             GUILayout.Label(Status);
             if (!Network.IsListening && !connecting && !stopping)
             {
                 GUILayout.Label("Host IPv4 (127.0.0.1 for same-PC tests)"); address = GUILayout.TextField(address);
                 GUILayout.Label("UDP port"); port = GUILayout.TextField(port);
+                DrawCharacterChoice(null);
                 if (GUILayout.Button("Host LAN")) StartSession(true);
                 if (GUILayout.Button("Join LAN")) StartSession(false);
             }
             else if (GUILayout.Button(connecting ? "Cancel" : "Leave")) Stop();
-            GUILayout.Label("WASD move • click arena to capture mouse • Esc releases");
-            GUILayout.Label("All visible players receive gaze; walls block it.");
+            var lobby = TeamLobby.Instance;
+            var local = Network.LocalClient?.PlayerObject?.GetComponent<NetworkPlayer>();
+            if (local && lobby && lobby.InLobby)
+            {
+                DrawCharacterChoice(local);
+                GUILayout.Space(8);
+                GUILayout.Label("CHOOSE YOUR TEAM (2 players maximum)");
+                GUILayout.BeginHorizontal();
+                foreach (var team in new[] { TeamId.A, TeamId.B })
+                {
+                    int count = lobby.Count(team);
+                    GUI.enabled = local.Team.Value != team && TeamLobby.HasTeamSpace(team,count);
+                    if (GUILayout.Button($"{(local.Team.Value == team ? "✓ " : "")}Team {team}  {count}/2")) local.SelectTeamRpc(team);
+                }
+                GUI.enabled = true; GUILayout.EndHorizontal();
+                GUILayout.Label("Switching teams clears everyone's Ready state.");
+                GUILayout.Label($"TEAM {local.Team.Value}  /  {(lobby.IsLeader(local) ? "You are the team leader" : "Leader: Player " + lobby.Leader(local.Team.Value)?.OwnerClientId)}");
+                GUILayout.Label("Team color — each team uses a different color");
+                for (int row = 0; row < 2; row++)
+                {
+                    GUILayout.BeginHorizontal();
+                    for (byte i = (byte)(row*3); i < row*3+3; i++)
+                    {
+                        byte opponent = lobby.Index(local.Team.Value == TeamId.A ? TeamId.B : TeamId.A);
+                        GUI.enabled = lobby.IsLeader(local) && i != opponent;
+                        GUI.backgroundColor = TeamPalette.Color(i);
+                        if (GUILayout.Button((lobby.Index(local.Team.Value) == i ? "✓ " : "") + TeamPalette.Names[i])) local.SelectColorRpc(i);
+                    }
+                    GUI.backgroundColor = Color.white; GUI.enabled = true;
+                    GUILayout.EndHorizontal();
+                }
+                GUILayout.Label("Changing a team's color clears that team's Ready state.");
+                if (GUILayout.Button(local.Ready.Value ? "Ready ✓ — click to change" : "Ready up")) local.SetReadyRpc(!local.Ready.Value);
+                if (Network.IsServer)
+                {
+                    GUI.enabled = lobby.CanStart;
+                    if (GUILayout.Button("Start game")) lobby.StartGame();
+                    GUI.enabled = true;
+                }
+                GUILayout.Label("Both teams need a player. Everyone must be ready.");
+            }
+            else if (Network.IsServer && lobby && lobby.Playing.Value && GUILayout.Button("Return everyone to lobby")) lobby.ReturnToLobby();
+            GUILayout.Label("WASD move • Space jump • click arena • Esc releases");
             if (Gaze && Network.IsConnectedClient)
             {
                 foreach (var p in Gaze.Players)
                 {
                     GUILayout.BeginHorizontal();
-                    GUILayout.Label($"Player {p.OwnerClientId}: Team {p.Team.Value}");
+                    string color = lobby ? TeamPalette.Names[lobby.Index(p.Team.Value)] : "";
+                    GUILayout.Label($"P{p.OwnerClientId} · {p.Character.Value} · {p.Team.Value}/{color} {(lobby && lobby.IsLeader(p) ? "★" : "")} {(p.Ready.Value ? "Ready" : "")} ");
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                    if (Network.IsServer && GUILayout.Button("Switch team (test)")) Gaze.SetTeam(p, p.Team.Value == TeamId.A ? TeamId.B : TeamId.A);
+                    if (Network.IsServer && TeamLobby.ProbeBypass && GUILayout.Button("Switch team (test)")) Gaze.SetTeam(p, p.Team.Value == TeamId.A ? TeamId.B : TeamId.A);
 #endif
                     GUILayout.EndHorizontal();
                 }
             }
-            GUILayout.EndArea();
+            GUILayout.EndScrollView(); GUILayout.EndArea();
+        }
+        void DrawCharacterChoice(NetworkPlayer player)
+        {
+            GUILayout.Space(8); GUILayout.Label("CHOOSE YOUR CHARACTER");
+            var selected = player ? player.Character.Value : SelectedCharacter;
+            int next = GUILayout.SelectionGrid((int)selected, new[] { "Devil", "Ghost" }, 2);
+            GUILayout.Label(next == 0 ? "A horned puff with a bouncy walk." : "A floating wisp with a rippling hem.");
+            if (next != (int)selected)
+            {
+                SelectedCharacter = (CharacterId)next;
+                if (player) player.SelectCharacterRpc(SelectedCharacter);
+            }
         }
     }
 }
