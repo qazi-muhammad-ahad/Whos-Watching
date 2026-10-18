@@ -48,6 +48,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1064026361350350329, guid: 3eee0a61d6e43da4c9a19774f684edd1, type: 3}
+      propertyPath: Team
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5716632358630806276, guid: 3eee0a61d6e43da4c9a19774f684edd1, type: 3}
       propertyPath: m_Name
       value: Platform_Connector_Cross_TeamA

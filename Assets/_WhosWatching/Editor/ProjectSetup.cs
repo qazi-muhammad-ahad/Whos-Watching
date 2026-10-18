@@ -88,7 +88,7 @@ namespace WhosWatching.Editor
         public static void Build()
         {
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions {
-                scenes = new[] { Root + "Scenes/Main.unity" }, locationPathName = "Builds/Windows/WhosWatching.exe",
+                scenes = new[] { Root + "Scenes/Arena.unity" }, locationPathName = "Builds/Windows/WhosWatching.exe",
                 target = BuildTarget.StandaloneWindows64, options = BuildOptions.Development });
             if (report.summary.result != BuildResult.Succeeded) throw new System.Exception("Windows build failed: " + report.summary.result);
         }

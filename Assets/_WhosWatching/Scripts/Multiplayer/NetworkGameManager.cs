@@ -14,6 +14,7 @@ namespace WhosWatching
         public GazeSystem Gaze;
         public string Status = "Offline";
         public CharacterId SelectedCharacter;
+        public string PlayerName = "Player";
         Vector2 lobbyScroll;
         string address = "127.0.0.1", port = "7777";
         readonly Dictionary<ulong, double> reservations = new();
@@ -24,6 +25,7 @@ namespace WhosWatching
         void Awake()
         {
             Instance = this;
+            PlayerName = NetworkPlayer.CleanName(PlayerPrefs.GetString("WW.PlayerName", "Player"));
             if (!Gaze) Gaze = GetComponent<GazeSystem>();
             Application.runInBackground = true;
             Time.fixedDeltaTime = 1f / 30;
@@ -84,6 +86,7 @@ namespace WhosWatching
         public void StartSession(bool host, string ip = null, string portText = null)
         {
             if (Network.IsListening || Network.ShutdownInProgress || connecting || stopping) return;
+            PlayerPrefs.Save();
             address = ip ?? address; port = portText ?? port;
             if (!SessionRules.Endpoint(address, port, out var number)) { Status = "Enter a valid IPv4 address and port 1–65535."; return; }
             try
@@ -119,82 +122,103 @@ namespace WhosWatching
         }
         void OnGUI()
         {
-            GUILayout.BeginArea(new Rect(12, 12, 380, Mathf.Min(Screen.height - 24, 720)), GUI.skin.box);
-            lobbyScroll = GUILayout.BeginScrollView(lobbyScroll);
-            GUILayout.Label("WHO'S WATCHING?  /  TEAM LOBBY");
-            GUILayout.Label(Status);
-            if (!Network.IsListening && !connecting && !stopping)
+            using (GameUI.Begin())
             {
-                GUILayout.Label("Host IPv4 (127.0.0.1 for same-PC tests)"); address = GUILayout.TextField(address);
-                GUILayout.Label("UDP port"); port = GUILayout.TextField(port);
-                DrawCharacterChoice(null);
-                if (GUILayout.Button("Host LAN")) StartSession(true);
-                if (GUILayout.Button("Join LAN")) StartSession(false);
-            }
-            else if (GUILayout.Button(connecting ? "Cancel" : "Leave")) Stop();
-            var lobby = TeamLobby.Instance;
-            var local = Network.LocalClient?.PlayerObject?.GetComponent<NetworkPlayer>();
-            if (local && lobby && lobby.InLobby)
-            {
-                DrawCharacterChoice(local);
-                GUILayout.Space(8);
-                GUILayout.Label("CHOOSE YOUR TEAM (2 players maximum)");
-                GUILayout.BeginHorizontal();
-                foreach (var team in new[] { TeamId.A, TeamId.B })
+                GUI.depth=-10;
+                var lobby=TeamLobby.Instance;
+                var local=Network.LocalClient?.PlayerObject?.GetComponent<NetworkPlayer>();
+                if(lobby && lobby.IsSpawned && lobby.Playing.Value)
                 {
-                    int count = lobby.Count(team);
-                    GUI.enabled = local.Team.Value != team && TeamLobby.HasTeamSpace(team,count);
-                    if (GUILayout.Button($"{(local.Team.Value == team ? "✓ " : "")}Team {team}  {count}/2")) local.SelectTeamRpc(team);
+                    if(Cursor.lockState==CursorLockMode.Locked) return;
+                    var menu=new Rect(GameUI.Width-300,20,280,255);GameUI.Card(menu);
+                    GUILayout.BeginArea(new Rect(menu.x+16,menu.y+10,248,235));
+                    GUILayout.Label("TAKE A BREATHER",GameUI.Heading);
+                    GameUI.HudChoice();
+                    GUILayout.Label("H switches HUD   /   click arena to play",GameUI.Small);
+                    if(Network.IsServer && GameUI.Button("BACK TO LOBBY",GameUI.Gold)) lobby.ReturnToLobby();
+                    if(GameUI.Button("LEAVE MATCH",GameUI.Cream)) Stop();
+                    GUILayout.EndArea();return;
                 }
-                GUI.enabled = true; GUILayout.EndHorizontal();
-                GUILayout.Label("Switching teams clears everyone's Ready state.");
-                GUILayout.Label($"TEAM {local.Team.Value}  /  {(lobby.IsLeader(local) ? "You are the team leader" : "Leader: Player " + lobby.Leader(local.Team.Value)?.OwnerClientId)}");
-                GUILayout.Label("Team color — each team uses a different color");
-                for (int row = 0; row < 2; row++)
+                GameUI.Fill(new Rect(0,0,GameUI.Width,GameUI.Height),new Color(0.035f,0.045f,0.10f,0.83f),false);
+                GUI.Label(new Rect(0,20,GameUI.Width,60),"WHO'S WATCHING?",GameUI.Title);
+                GUI.Label(new Rect(0,80,GameUI.Width,30),"A LITTLE TEAMWORK. A LITTLE TROUBLE.",GameUI.Center);
+                float left=GameUI.Width/2-480;
+                GameUI.Card(new Rect(left,130,590,545));GameUI.Card(new Rect(left+610,130,350,545));
+                GUILayout.BeginArea(new Rect(left+24,147,542,510));
+                lobbyScroll=GUILayout.BeginScrollView(lobbyScroll);
+                GUILayout.Label(local?"YOUR CREW, YOUR CALL":"LET'S MAKE SOME MISCHIEF",GameUI.Heading);
+                GUILayout.Label(Status,GameUI.Small);
+                if(!Network.IsListening && !connecting && !stopping)
                 {
+                    DrawCharacterChoice(null);
+                    GUILayout.Space(12);GUILayout.Label("JOIN A FRIEND",GameUI.Heading);
+                    GUILayout.Label("Host address",GameUI.Small);address=GUILayout.TextField(address);
+                    GUILayout.Label("Port",GameUI.Small);port=GUILayout.TextField(port);
                     GUILayout.BeginHorizontal();
-                    for (byte i = (byte)(row*3); i < row*3+3; i++)
-                    {
-                        byte opponent = lobby.Index(local.Team.Value == TeamId.A ? TeamId.B : TeamId.A);
-                        GUI.enabled = lobby.IsLeader(local) && i != opponent;
-                        GUI.backgroundColor = TeamPalette.Color(i);
-                        if (GUILayout.Button((lobby.Index(local.Team.Value) == i ? "✓ " : "") + TeamPalette.Names[i])) local.SelectColorRpc(i);
+                    if(GameUI.Button("HOST A GAME",GameUI.Gold)) StartSession(true);
+                    if(GameUI.Button("JOIN GAME",GameUI.Mint)) StartSession(false);
+                    GUILayout.EndHorizontal();
+                }
+                else if(local && lobby && lobby.InLobby)
+                {
+                    DrawCharacterChoice(local);
+                    GUILayout.Label("PICK YOUR SIDE",GameUI.Heading);
+                    GUILayout.BeginHorizontal();
+                    foreach(var team in new[]{TeamId.A,TeamId.B}) {
+                        int count=lobby.Count(team);GUI.enabled=local.Team.Value!=team && TeamLobby.HasTeamSpace(team,count);
+                        if(GameUI.Button($"{(local.Team.Value==team?"> ":"")}TEAM {team}    {count}/2",Color.Lerp(lobby.Color(team),Color.white,0.35f))) local.SelectTeamRpc(team);
                     }
-                    GUI.backgroundColor = Color.white; GUI.enabled = true;
-                    GUILayout.EndHorizontal();
-                }
-                GUILayout.Label("Changing a team's color clears that team's Ready state.");
-                if (GUILayout.Button(local.Ready.Value ? "Ready ✓ — click to change" : "Ready up")) local.SetReadyRpc(!local.Ready.Value);
-                if (Network.IsServer)
-                {
-                    GUI.enabled = lobby.CanStart;
-                    if (GUILayout.Button("Start game")) lobby.StartGame();
-                    GUI.enabled = true;
-                }
-                GUILayout.Label("Both teams need a player. Everyone must be ready.");
-            }
-            else if (Network.IsServer && lobby && lobby.Playing.Value && GUILayout.Button("Return everyone to lobby")) lobby.ReturnToLobby();
-            GUILayout.Label("WASD move • Space jump • click arena • Esc releases");
-            if (Gaze && Network.IsConnectedClient)
-            {
-                foreach (var p in Gaze.Players)
-                {
+                    GUI.enabled=true;GUILayout.EndHorizontal();
+                    GUILayout.Label(lobby.IsLeader(local)?"Team leader: choose your crew's color":"Your team leader chooses the color",GameUI.Small);
                     GUILayout.BeginHorizontal();
-                    string color = lobby ? TeamPalette.Names[lobby.Index(p.Team.Value)] : "";
-                    GUILayout.Label($"P{p.OwnerClientId} · {p.Character.Value} · {p.Team.Value}/{color} {(lobby && lobby.IsLeader(p) ? "★" : "")} {(p.Ready.Value ? "Ready" : "")} ");
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                    if (Network.IsServer && TeamLobby.ProbeBypass && GUILayout.Button("Switch team (test)")) Gaze.SetTeam(p, p.Team.Value == TeamId.A ? TeamId.B : TeamId.A);
-#endif
-                    GUILayout.EndHorizontal();
+                    for(byte i=0;i<TeamPalette.Count;i++) {
+                        if(i==3) { GUILayout.EndHorizontal();GUILayout.BeginHorizontal(); }
+                        GUI.enabled=lobby.IsLeader(local) && i!=lobby.Index(local.Team.Value==TeamId.A?TeamId.B:TeamId.A);
+                        if(GameUI.Button((lobby.Index(local.Team.Value)==i?">":"")+TeamPalette.Names[i],Color.Lerp(TeamPalette.Color(i),Color.white,0.3f),GUILayout.Height(35))) local.SelectColorRpc(i);
+                    }
+                    GUI.enabled=true;GUILayout.EndHorizontal();
+                    if(GameUI.Button(local.Ready.Value?"READY!  /  click to unready":"I'M READY!",GameUI.Mint)) local.SetReadyRpc(!local.Ready.Value);
+                    if(Network.IsServer) {
+                        GUI.enabled=lobby.CanStart;if(GameUI.Button("LET'S GO!",GameUI.Gold)) lobby.StartGame();GUI.enabled=true;
+                    }
+                    GUILayout.Label("Both teams need a player. Everyone must be ready.",GameUI.Small);
                 }
+                if(Network.IsListening || connecting || stopping) if(GameUI.Button(connecting?"CANCEL":"LEAVE LOBBY",GameUI.Cream)) Stop();
+                GUILayout.EndScrollView();GUILayout.EndArea();
+                GUILayout.BeginArea(new Rect(left+632,148,306,508));
+                GUILayout.Label("EYES ON THE PRIZE",GameUI.Heading);
+                GUILayout.Label("Carry crates. Build checkpoints.\nSteal the spotlight.");GUILayout.Space(8);
+                GUILayout.Label("01   BACK YOUR BUDDY",GameUI.Heading);
+                GUILayout.Label("Look at allies to boost them. Stare down rivals to slow them.",GameUI.Small);
+                GUILayout.Label("02   BUILD & BOTHER",GameUI.Heading);
+                GUILayout.Label("Finish your two checkpoints. Sabotage theirs. Save a crate for the middle!",GameUI.Small);
+                GUILayout.Label("03   CLAIM THE CROWN",GameUI.Heading);
+                GUILayout.Label("The middle wins it. Five minutes, then score or sudden-death overtime.",GameUI.Small);
+                GUILayout.Space(9);GameUI.HudChoice();
+                GUILayout.Label("H switches HUD. Essentials keeps names, scores and the timer.",GameUI.Small);
+                if(Gaze && Network.IsConnectedClient) {
+                    GUILayout.Space(8);GUILayout.Label("ROLL CALL",GameUI.Heading);
+                    foreach(var p in Gaze.Players) GUILayout.Label($"{p.DisplayName.Value}  /  TEAM {p.Team.Value}  /  {(p.Ready.Value?"READY":"choosing...")}",GameUI.Small);
+                }
+                GUILayout.EndArea();
+                GUI.Label(new Rect(0,GameUI.Height-32,GameUI.Width,25),"WASD  MOVE     SPACE  JUMP     F  PICK UP     E  WORK     CLICK  PUNCH",GameUI.Center);
             }
-            GUILayout.EndScrollView(); GUILayout.EndArea();
         }
         void DrawCharacterChoice(NetworkPlayer player)
         {
-            GUILayout.Space(8); GUILayout.Label("CHOOSE YOUR CHARACTER");
+            GUILayout.Label("YOUR NAME", GameUI.Small);
+            string nextName = GUILayout.TextField(PlayerName,16);
+            if(nextName != PlayerName) {
+                PlayerName=nextName; PlayerPrefs.SetString("WW.PlayerName",NetworkPlayer.CleanName(nextName));
+                if(player) player.SetDisplayNameRpc(nextName);
+            }
+            GUILayout.Space(8); GUILayout.Label("CHOOSE YOUR LITTLE MENACE",GameUI.Heading);
             var selected = player ? player.Character.Value : SelectedCharacter;
-            int next = GUILayout.SelectionGrid((int)selected, new[] { "Devil", "Ghost" }, 2);
+            int next=(int)selected;
+            GUILayout.BeginHorizontal();
+            if(GameUI.Button((next==0?"> ":"")+"DEVIL",next==0?GameUI.Gold:GameUI.Cream)) next=0;
+            if(GameUI.Button((next==1?"> ":"")+"GHOST",next==1?GameUI.Mint:GameUI.Cream)) next=1;
+            GUILayout.EndHorizontal();
             GUILayout.Label(next == 0 ? "A horned puff with a bouncy walk." : "A floating wisp with a rippling hem.");
             if (next != (int)selected)
             {
@@ -204,3 +228,5 @@ namespace WhosWatching
         }
     }
 }
+
+

@@ -15,6 +15,9 @@ namespace WhosWatching
         float airBlend, landing;
         bool wasAirborne;
         bool captured;
+        Transform leftArm, rightArm;
+        uint punchSequence, hitSequence, respawnSequence;
+        float punch, hit, spawn;
         void Start() { player = GetComponentInParent<NetworkPlayer>(); if (!Animator) Animator = GetComponent<Animator>(); CapturePose(); }
         void CapturePose()
         {
@@ -47,6 +50,29 @@ namespace WhosWatching
             phase = Mathf.Repeat(phase + Time.deltaTime * Mathf.Lerp(Floating ? 0.65f : 0.8f, Floating ? 1.05f : 1.8f, Mathf.Clamp01(speed / 5)) * Mathf.PI * 2, Mathf.PI * 2);
             SampleMotion(phase,speed,expression*(1-airBlend));
             ApplyJumpShape(airBlend,landing);
+            ApplyActions();
+        }
+        void ApplyActions()
+        {
+            if (!rightArm)
+                foreach (var bone in GetComponentsInChildren<Transform>()) {
+                    if (bone.name == "Arm.R") rightArm = bone;
+                    if (bone.name == "Arm.L") leftArm = bone;
+                }
+            if (punchSequence != player.PunchSequence.Value) { punchSequence = player.PunchSequence.Value; punch = 1; }
+            if (hitSequence != player.HitSequence.Value) { hitSequence = player.HitSequence.Value; hit = 1; }
+            if (respawnSequence != player.RespawnSequence.Value) { respawnSequence = player.RespawnSequence.Value; spawn = 1; }
+            punch = Mathf.MoveTowards(punch,0,Time.deltaTime*3.5f);
+            hit = Mathf.MoveTowards(hit,0,Time.deltaTime*3);
+            spawn = Mathf.MoveTowards(spawn,0,Time.deltaTime*2);
+            bool carrying = ArenaGameplay.Instance && ArenaGameplay.Instance.Carrying(player) >= 0;
+            float working = player.Working.Value ? Mathf.Sin(Time.time * 15 * player.Gaze.Value.Work) : 0;
+            float strike = Mathf.Sin(punch * Mathf.PI);
+            if (rightArm) rightArm.localRotation *= Quaternion.Euler(-65 * strike - (carrying ? 35 : 0) + working * 22, 0, -20 * strike);
+            if (leftArm) leftArm.localRotation *= Quaternion.Euler(-(carrying ? 35 : 0) - working * 22, 0, 0);
+            transform.localRotation = Quaternion.Euler(-hit*18 + working*3, strike*15, hit*Mathf.Sin(Time.time*35)*10) * transform.localRotation;
+            transform.localPosition += Vector3.forward * (strike*0.14f);
+            transform.localScale *= 1 - spawn*0.45f;
         }
         // Same deterministic sampler used for visual QA; changes only the visual child.
         public void SampleMotion(float cycle, float metersPerSecond, float weight = 1)

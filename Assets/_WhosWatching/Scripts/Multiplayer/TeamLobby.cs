@@ -11,7 +11,8 @@ namespace WhosWatching
         public NetworkVariable<byte> ColorA = new(0), ColorB = new(1);
         public NetworkVariable<bool> Playing = new(false);
         public bool InLobby => IsSpawned && !Playing.Value;
-        public static bool GameplayAllowed => Instance && Instance.IsSpawned && (Instance.Playing.Value || ProbeBypass);
+        public static bool GameplayAllowed => Instance && Instance.IsSpawned && (Instance.Playing.Value || ProbeBypass) &&
+            (!ArenaGameplay.Instance || !ArenaGameplay.Instance.IsSpawned || !ArenaGameplay.Instance.Finished.Value);
         public static bool ProbeBypass {
             get {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -59,12 +60,14 @@ namespace WhosWatching
         {
             if (!IsServer || !CanStart) return;
             Playing.Value = true;
+            if (ArenaGameplay.Instance) ArenaGameplay.Instance.SpawnEveryone();
             NetworkGameManager.Instance.Gaze.ResetEffects();
         }
         public void ReturnToLobby()
         {
             if (!IsServer) return;
             Playing.Value = false;
+            if (ArenaGameplay.Instance) ArenaGameplay.Instance.ResetRound();
             foreach (var p in NetworkGameManager.Instance.Gaze.Players) p.Ready.Value = false;
             NetworkGameManager.Instance.Gaze.ResetEffects();
         }

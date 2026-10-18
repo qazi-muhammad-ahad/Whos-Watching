@@ -1,31 +1,48 @@
-# Project handoff — 2026-10-17
+# Project handoff — 2026-10-18
 
-## Current objective
-Finish team-specific environment variants, cartoon movement, lobby team switching, Space jumping/animations and environment collision. Implementation and automated validation are complete. No commits/pushes made. Unity 6000.3.23f1; network protocol `whos-watching/lan/6-jump` requires matching peer builds.
+## Current status
+Requested Arena gameplay, configurable audio slots, cartoon lobby/HUD, Detailed/Essentials mode, player names and detailed developer README are implemented. Final build succeeded; 60/60 EditMode tests and final two-peer smoke passed. No commits/pushes. User explicitly allowed using the reserve to finish README; README is now complete. Recheck usage before any new implementation.
 
-## Completed
-- Earlier character selection and six leader-selectable team presets remain. Ghost body and arms share dark main color; Devil uses dark body/light hands, feet and blush. Original source FBXs preserved.
-- 54 linked variants under `Assets/_WhosWatching/Prefabs/TeamReady/TeamA` and `TeamB`, derived from 27 shared bases. Nested TeamTint ownership prevents a parent map tint overwriting child team accents; editor preview supported.
-- Smoothed visual-only bob, sway, lean and squash in `Scripts/Player/CharacterPresentation.cs`; MotionAmount tunes strength without moving gameplay root/camera.
-- Lobby A/B buttons, capacity two, server validation, readiness reset and leader succession. A free slot is required; reciprocal full-team swaps are not implemented.
-- `NetworkPlayer.cs` adds server-authoritative grounded Space jump, repeat rejection, ceiling response and replicated Airborne. Both character controllers have Jump poses; presentation adds landing squash.
-- Crate BoxColliders and static structural MeshColliders on all 27 bases, inherited by all 54 variants. Decorative pieces excluded. Existing Main imported props received matching colliders without repositioning.
-- Editor maintenance: `TeamVariantSetup.cs`, `JumpAndCollisionSetup.cs`, updated `AppearanceSetup.cs` preserve nested bindings and regenerate variants/jumps/collision. Paths above are relative to `Assets/_WhosWatching` unless explicit.
-- Docs/TeamAppearance.md explains authoring/use; README, Todo and Docs/Decisions updated.
+## Main entry points
+- README.md is the current developer tuning guide: Inspector versus code settings, actual defaults, movement/gaze/punch/work/round rules, audio, names/UI, appearance, project/build settings and tuning recipes. User's cross-network connectivity question was intentionally excluded.
+- Docs/ArenaGameplay.md is the player/control/audio-assignment guide.
+- Main scene: Assets/_WhosWatching/Scenes/Arena.unity. Build: Builds/Windows/WhosWatching.exe plus adjacent runtime/data folders.
+- Matching-peer protocol: whos-watching/lan/9-arena-ui.
+
+## Implemented gameplay
+- Three usable crates per team, including carried supply; two owned checkpoints unlock the shared middle objective. Placement consumes; sabotage restores supply. Crates return on Q, fall, hit or disconnect.
+- Server-authoritative F pickup, E hold-to-work, Q return, left-click punch. Gaze affects movement, work and punch force. Placement 3 seconds and sabotage 4 seconds at neutral workforce; range/aim/LOS validation and interruption reset.
+- Base spawn anchors, deathbox plus below-map fallback, NetworkTransform respawn, 1.25-second punch protection, knockback/cooldown.
+- Final placement wins. Regulation 300 seconds: more completed checkpoints wins, tie starts 180-second overtime. Final placement or successful enemy-checkpoint sabotage wins overtime; expiry draws. Host can reset via lobby.
+- Existing animation plus procedural work/punch/carry/hit/respawn poses and first-person hands.
+
+## Audio / UI / names
+- Root Arena Audio scene object holds optional named clips for music, separate Devil/Ghost walking/jump, landing, buff/debuff, swing/impact, checkpoint completion/sabotage, pickup/return/respawn and round/overtime/victory/defeat/draw.
+- Separate music/effects volumes, footstep gain/cadence, optional mixer groups and bounded spatial voice pool. No audio files supplied: all saved slots empty; audible balancing not performed.
+- GameUI shared cartoon IMGUI theme, lobby/pause panels, scoreboard/timer/results and compact detailed HUD.
+- Persistent Detailed/Essentials toggle in lobby/pause and H key. Essentials keeps reticle, scores/timer/nameplates; hides instructions/work/status detail. Results/menu remain visible.
+- Lobby name entry, 16-character sanitized server-owned FixedString64Bytes DisplayName, occluded nameplates within 28 units, saved local name. Duplicate names allowed. Server name changes permitted only in lobby.
+- One targeted Team A ownership override fixed in TeamA/Platform_Connector_Cross_TeamA.prefab. User's separate shared-base collider edit and scene layout preserved.
+
+## Source map
+Relative to Assets/_WhosWatching:
+- Scripts/Multiplayer/ArenaGameplay.cs, ArenaDeathbox.cs, ArenaAudio.cs, GameUI.cs, TeamLobby.cs, NetworkGameManager.cs, SessionRules.cs.
+- Scripts/Player/NetworkPlayer.cs, CharacterPresentation.cs, ArenaHands.cs.
+- Editor/ArenaSetup.cs and ArenaAudioSetup.cs; ProjectSetup.Build now targets Arena.
+- Tests/EditMode/ArenaTests.cs, ArenaAudioTests.cs, PlayerNameTests.cs.
+- Development probes: Scripts/Multiplayer/ArenaProbe.cs, ArenaUIPreview.cs; root Tools/ArenaSmoke.ps1.
+- Runtime asmdef now references Unity.Collections; built-in imageconversion module added to Packages for development screenshot output.
 
 ## Validation actually run
-- 47/47 EditMode tests passed (appearance, variant source links/nested isolation, motion bounds, collision presence, surface raycasts, jump clips, previous session/gaze coverage).
-- Final Windows build succeeded; ignored executable `Builds/Windows/WhosWatching.exe`. Latest rebuild also succeeded after test-fixture change (`Logs/Build.log`).
-- Real Unity motion and jump previews rendered and inspected (`Logs/MotionPreview-*.png`, `Logs/JumpPreview.png`).
-- Final collider-enabled four-peer AppearanceSmoke passed 14 stages on three survivors (16383); departing leader passed seven (127).
-- Two-peer JumpSmoke passed seven stages on each (127): lobby gate, actual jump/landing, no airborne repeat, ceiling, remote animator. Peaks 1.333/1.287 m; ceiling peaks 0.620/0.500 m.
-- First collider-enabled ScreenGazeSmoke failed stages 1–3 because newly collidable imported props obstructed the old synthetic sightline. ScreenGazeProbe now creates its explicit test pad at X=100; normal arena collision unchanged. Rebuild and rerun passed all 18 stages on all four peers (262143/262143).
-- Source/docs/scripts whitespace check passed. Unity YAML has generated trailing spaces. Asset metadata checked; generated machine-specific Resources files removed.
+- Final EditMode suite: 60/60 passed, Logs/UIEditMode.xml. Includes previously failing variant ownership and new name cases.
+- Final Windows development build succeeded, Logs/UIBuild.log.
+- Final Tools/ArenaSmoke.ps1 exited 0: host PASS 24 assertions, client PASS replicated timeout. Logs/Arena-0.log and Arena-1.log. Includes replicated names, spawn/supply, pickup/placement/sabotage, fall return, punch/cooldown, final unlock/win, reset, regulation score winner, tied overtime, overtime sabotage winner and overtime draw. No detected runtime exceptions on successful final run.
+- Runtime screenshot helper completed under default graphics and D3D11 without reported exceptions, but ReadPixels output was blank (gray/black). These images are NOT visual acceptance evidence. No visual verification of final UI/nameplates or audio balance is claimed.
+- README links/locations checked against source and scene/asset values. No gameplay changes made during README request.
 
-## Pending operation and next actions
-- No pending operations. Requested implementation and automated checks are complete. Open Main for manual playtesting when ready.
-- Recheck account quota before further implementation/tests; preserve the last 10% for handoff. No further feature work is needed for requested scope.
-- Manual full UI/gameplay and separate-PC LAN acceptance remain untested. Automated peers use headless loopback processes. Prior two-peer GazeSmoke passed before this follow-up, not rerun on final collider build.
-- Preserve user Mobile_RPAsset edit and saved Main layout. User saved/closed Unity before migrations. Checkpoint remains visual-only; objective rounds/scoring and host migration are outside scope. Props are static, not Rigidbody-driven crates.
-- Keep Library, Builds, Logs and machine-generated files out of commits. Commit only if requested.
-
+## Pending / next actions
+- No builds, smoke processes or editor operations remain pending.
+- User should open Arena and manually check UI layout/long names on actual display; capture route needs repair only if automated visual QA is desired. Do not use blank Logs/UI-*.png as previews.
+- Assign actual audio clips in Arena Audio, save scene and rebuild. Empty slots intentionally do nothing.
+- Separate-device play and subjective visuals/audio remain manual checks. Automated peers used same-machine transport; timeout tests accelerated server deadlines.
+- Existing Plan.md/Todo.md retain historical planning; current scope notes and this handoff/README supersede obsolete claims about Main or objective work being future work.
