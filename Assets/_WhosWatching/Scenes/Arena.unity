@@ -9571,30 +9571,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9d78fda86e35f94a89e063269c0920a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WhosWatching.Runtime::WhosWatching.ArenaAudio
-  BackgroundMusic: {fileID: 0}
+  BackgroundMusic: {fileID: 8300000, guid: 5bcc1db49d38bf44a94a603b0479229f, type: 3}
   MusicInLobby: 1
   MusicVolume: 0.35
   MusicMixer: {fileID: 0}
-  DevilWalking: {fileID: 0}
-  GhostWalking: {fileID: 0}
-  DevilJump: {fileID: 0}
-  GhostJump: {fileID: 0}
+  DevilWalking: {fileID: 8300000, guid: b057fe57622c48345a13eee43a67c9b7, type: 3}
+  GhostWalking: {fileID: 8300000, guid: 29eb3ef89e37e3c4a851249cec493bdc, type: 3}
+  DevilJump: {fileID: 8300000, guid: e869db900ac01ad41b414a6f428d293b, type: 3}
+  GhostJump: {fileID: 8300000, guid: 8e921b3a614dbad4bb01920b49903583, type: 3}
   Landing: {fileID: 0}
   FootstepInterval: 0.42
   FootstepVolume: 0.5
-  BuffEffect: {fileID: 0}
-  DebuffEffect: {fileID: 0}
-  Punch: {fileID: 0}
+  BuffEffect: {fileID: 8300000, guid: 04c280b51efb74644a6e33e07ca7f337, type: 3}
+  DebuffEffect: {fileID: 8300000, guid: 81f43de4fdeef5141873f56fa0f06d6a, type: 3}
+  Punch: {fileID: 8300000, guid: ab21103471a73e646a867cf1dd6cc553, type: 3}
   PunchImpact: {fileID: 0}
-  CheckpointComplete: {fileID: 0}
+  CheckpointComplete: {fileID: 8300000, guid: cd3b799ba3252914abfcef56ade4a736, type: 3}
   CheckpointSabotage: {fileID: 0}
   CratePickup: {fileID: 0}
   CrateReturn: {fileID: 0}
   Respawn: {fileID: 0}
   RoundStart: {fileID: 0}
   OvertimeStart: {fileID: 0}
-  Victory: {fileID: 0}
-  Defeat: {fileID: 0}
+  Victory: {fileID: 8300000, guid: 8c4041c7ddc7e414cb4a54b93d2f37ee, type: 3}
+  Defeat: {fileID: 8300000, guid: 905c87ece5a0b0a45bbc14b093ee0382, type: 3}
   Draw: {fileID: 0}
   EffectsVolume: 0.8
   EffectsMixer: {fileID: 0}
