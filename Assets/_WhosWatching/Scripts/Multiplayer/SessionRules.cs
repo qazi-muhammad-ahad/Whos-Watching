@@ -10,7 +10,7 @@ namespace WhosWatching
     public static class SessionRules
     {
         public const int Capacity = 4;
-        public const string Protocol = "whos-watching/lan/6-jump";
+        public const string Protocol = "whos-watching/lan/9-arena-ui";
         public static byte[] Payload => Encoding.UTF8.GetBytes(Protocol);
         public static string Reject(byte[] payload, int occupied, bool lobby)
         {
@@ -36,3 +36,4 @@ namespace WhosWatching
             Mathf.Abs(move.x) <= 2 && Mathf.Abs(move.y) <= 2 && Mathf.Abs(yaw) <= 36000 && Mathf.Abs(pitch) <= 90;
     }
 }
+
