@@ -64,3 +64,29 @@ Working tree based on bb534cf; Unity 6000.3.23f1, protocol 3-screen-gaze. This e
 - Local ignored evidence: Logs/EditMode.xml, Test.log, Build.log, ScreenGaze4-0/1/2/3.log, Gaze2-0/1.log. The failed initial screen logs were overwritten by the final rerun; its failure and remedy are recorded above.
 
 These are headless separate processes on one PC, with synthetic input through owner RPCs. Manual camera/HUD rendering and separate-PC LAN acceptance for this revision remain pending. Fixed body samples approximate visibility rather than testing every rendered pixel; extremely thin slivers can miss. Exact work completion timing, network impairment, production rounds/objectives and full lifecycle acceptance remain outside this validation. The user reported the prior gaze worked; no user acceptance of this new build is claimed.
+
+## 2026-10-17 — character, lobby and team appearance
+- Unity 6000.3.23f1; protocol 4-team-appearance. Final Windows development build succeeded.
+- 36/36 EditMode tests passed: prior session/gaze tests plus palette validation, copied animation paths and sampled bone motion, root stability/scale, Ghost arm/body color equality, lighter Devil accents, material-slot isolation and all 27 team-ready prefabs.
+- Unity-rendered preview inspected after the user's final dark-body correction. Ghost body/arms share main color; Devil extremities/blush are lighter. Face/horns/neutral prop materials preserved. Image: ignored Logs/AppearancePreview.png.
+- Four-peer AppearanceSmoke passed: stages 0-8 on host and two surviving clients (511); the departing leader passed stages 0-6 (127). Covers offline initial choice, character swaps, owner/leader permissions, invalid IDs, duplicate colors, ready/start/lobby-input gates, play locks, lobby return, successor leadership, and actual renderer property blocks on characters and scene props.
+- Four-peer ScreenGazeSmoke passed all 18 stages on all peers (262143/262143), preserving the previous gaze behavior with the new art/lobby.
+- Initial appearance test assumed IDs followed spawn order; corrected the test teams after observing 0,2,1,3 spawn order. The next run caught host offline selection arriving before TeamLobby spawn; deferred initial submission until lobby availability and reran successfully. An initial strict color assertion was corrected to use floating-point tolerance.
+- Two-peer GazeSmoke passed all ten stages on both peers (1023), with work=True, movement=3 and disconnect cleanup. Final requested acceptance is complete.
+- Automated network peers are headless loopback processes. No separate-PC LAN, manual complete UI session, or full leave/rehost lifecycle acceptance claimed. Checkpoint is visual-only; objective rounds are outside this change.
+- git diff --check reports Unity-generated empty YAML fields with trailing spaces in Main, not C# whitespace errors. Source/asset metadata present. Generated test-machine metadata under Assets/Resources removed; build/log output remains ignored.
+
+
+## 2026-10-17 follow-up — variants, cartoon motion, teams and jumping
+- Generated 54 genuine linked variants: 27 under Prefabs/TeamReady/TeamA and 27 under TeamB. Shared geometry/colliders remain in the base. TeamTint supports editor previews and skips renderers owned by a nested TeamTint.
+- Added lobby team requests, two-player capacity, invalid/playing rejection, ready clearing and leader recalculation. Full-team pair swaps are not implemented; a slot must be open.
+- CharacterPresentation adds smoothed, bounded visual-only bob/sway/lean/roll/squash; retains dark Ghost arms/body and dark Devil body with light accents. Gameplay root/camera remain unaffected by this extra motion.
+- Added Space jump, owner-only reliable request validated against fresh gameplay input and grounded state. Server controls vertical motion/ceiling response; Airborne replication drives Jump pose and landing squash. Protocol now 6-jump.
+- Crates use one BoxCollider; structural static meshes use non-convex MeshColliders. Decoration is excluded. Applied to 27 bases (inherited by 54 variants) and existing Main imported props without moving them. These are static props, not Rigidbody-driven movable assets.
+- 47/47 EditMode tests passed. Includes links/isolation, continuous bounded motion, all 81 base/variant collision sets, crate boxes, raycast surfaces and jump bone bindings.
+- Windows build succeeded (Logs/JumpBuild.log). Motion poses and JumpPreview.png rendered with actual Unity assets and visually inspected.
+- Two-peer JumpSmoke passed all seven stages on both peers (127). Peak heights 1.333/1.287 m; low ceiling 0.620/0.500 m; remote Jump animation observed. Lobby rejection, airborne repeat rejection and landing verified.
+- Final collider-enabled fourteen-stage appearance suite passed (16383 on all three surviving peers; 127 on departing leader). Final ScreenGazeSmoke passed all 18 stages on all four peers (262143/262143). The first collider-enabled run exposed imported-prop obstruction of the old synthetic fixture (stages 1–3); moved only the explicit test pad to X=100, rebuilt successfully, and reran. Normal arena collision remains enabled.
+- Manual complete UI playthrough and separate-PC LAN remain untested.
+
+

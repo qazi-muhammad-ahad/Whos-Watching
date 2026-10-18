@@ -10,7 +10,7 @@ namespace WhosWatching
     public static class SessionRules
     {
         public const int Capacity = 4;
-        public const string Protocol = "whos-watching/lan/3-screen-gaze";
+        public const string Protocol = "whos-watching/lan/6-jump";
         public static byte[] Payload => Encoding.UTF8.GetBytes(Protocol);
         public static string Reject(byte[] payload, int occupied, bool lobby)
         {

@@ -28,3 +28,18 @@ User chose ALL visible players simultaneously and requested stacking amounts/lim
 Fixed body samples approximate screen visibility; both viewport and LOS must pass for the same sample. Dedicated GazeBody collider on layer 9 / GazeTarget matches the standard body; movement uses the separate CharacterController on Player layer. All GazeTarget physical collisions are disabled, while explicit gaze raycasts still hit it. This fixes controller-query shrinkage at the visible head. Preserve that collider when replacing art.
 
 One observer can support/disrupt multiple targets; independent acquisition timers and per-target incoming counts prevent duplicated sample contributions. The fixed three outgoing ID slots match the four-player cap; expanding player count requires a protocol/state update. A client's claimed aspect is bounded, not proof of its physical monitor; this remains the trusted-host LAN prototype.
+
+## Character and team appearance — 2026-10-17
+
+User requested Devil/Ghost selection before play, source FBX animations, and leader-selected team accents across imported props. Protocol advances to `4-team-appearance`. A dedicated scene TeamLobby NetworkObject owns two palette indices and a play gate; it is separate from NetworkManager. The common player prefab retains its gameplay root, controller, anchors and gaze body while instantiating the selected visual child.
+
+Six named presets replace the earlier planned host-selected three color pairs. Each team's earliest remaining connection is leader; duplicate opposing colors are rejected. Server-only writes, owner-authorized requests, readiness and start checks protect choices. A host can start with at least one player on each team when everyone is ready; full exact-size mode selection and round lifecycle remain future work. Normal lobby input/gaze are now gated; only explicit existing development probes bypass the gate.
+
+Per the user's refinement, Ghost's arms and body all use the darker main color. Devil's body uses the same main color and its hands/feet/blush use a lighter shade. Material-slot property blocks preserve eyes/horns and neutral environment materials. Source FBXs remain untouched; animation clips are copied with root authoring transforms removed. Main's imported-asset layout is preserved, with saved team assignments and reusable TeamReady wrappers for future arena arrangement.
+
+## Follow-up decisions
+- Each accented environment base has two named linked variants, TeamA and TeamB, allowing mixed-team nested map prefabs. Existing scene team assignments are preserved by regeneration. Property blocks remain per-slot and nested TeamTint owners take precedence.
+- Team selection is an owner-authorized lobby request with capacity two; success clears all readiness and recalculates leaders. A full target team is rejected; negotiated pair swaps are not part of this change.
+- Added cartoon motion is visual-only and speed-smoothed, with axis-aware squash/stretch and a tunable Motion Amount. Gaze body and camera do not inherit it.
+- Space jump is a grounded, server-authoritative action with replicated Airborne animation state, fixed nominal 1.25 m height, ceiling handling and no mid-air repeat. Ghost and Devil share physical rules. Protocol advanced to 6-jump.
+- Environment collision uses simple crate boxes and static mesh surfaces elsewhere; excludes non-solid decoration. Shared base colliders flow to both variants. Current Main props now block movement and gaze. Rigidbody-driven moving props require future dedicated setup.

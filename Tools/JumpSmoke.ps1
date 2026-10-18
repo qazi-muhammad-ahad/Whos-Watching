@@ -1,0 +1,19 @@
+$ErrorActionPreference = 'Stop'
+$project = Split-Path $PSScriptRoot -Parent
+$running = @()
+try {
+    for ($i=0; $i -lt 2; $i++) {
+        $role = if ($i -eq 0) { 'host' } else { 'client' }
+        $log = Join-Path $project "Logs/Jump-$i.log"
+        $running += Start-Process -FilePath (Join-Path $project 'Builds/Windows/WhosWatching.exe') -ArgumentList @('-batchmode','-nographics','-wwJump',$role,'-logFile',('"'+$log+'"')) -WindowStyle Hidden -PassThru
+        Start-Sleep -Seconds 2
+    }
+    foreach ($process in $running) { if (-not $process.WaitForExit(60000)) { throw 'Jump acceptance timeout.' } }
+    for ($i=0; $i -lt 2; $i++) {
+        $log = Join-Path $project "Logs/Jump-$i.log"
+        $result = Select-String -LiteralPath $log -Pattern 'WW_JUMP (PASS|FAIL)'
+        $result.Line
+        if ($running[$i].ExitCode -ne 0 -or -not $result -or $result.Line -notmatch 'WW_JUMP PASS') { throw "Jump acceptance failed: $log" }
+        if (Select-String -LiteralPath $log -Pattern 'Exception:|\[Error\]') { throw "Runtime error: $log" }
+    }
+} finally { foreach ($process in $running) { if (-not $process.HasExited) { Stop-Process -Id $process.Id } } }

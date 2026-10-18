@@ -4,6 +4,10 @@
 
 **Current status:** a Unity URP LAN development harness exists. Checked tasks have implementation evidence; uncompleted game and team-validation tasks remain open. See Docs/TestLog.md and progression.md.
 
+**Latest follow-up:** linked Team A/B variants for all accented environment assets, editor tint previews and nested ownership isolation, visual bob/sway/squash, capacity-checked lobby team switching, Space jumping/airborne poses, and environment colliders are implemented. These do not complete the remaining objective-round, mode-selection or production-UI tasks.
+
+**2026-10-17 appearance scope:** Devil/Ghost selection, first-connected team leaders, six individually selected presets, ready/start gating, animations and per-slot arena accents are implemented; see `Docs/TeamAppearance.md`. The user's six-color leader selection supersedes LOB-02's earlier host-selected color-pair design. Broader LOB tasks remain unchecked where they also require mode selection, team switching, full round lifecycle, or acceptance not covered by this change.
+
 ## How to use this checklist
 
 - Work by phase and gate, not by whichever feature looks most interesting. The first deliverable is a multiplayer gaze slice with primitive visuals.

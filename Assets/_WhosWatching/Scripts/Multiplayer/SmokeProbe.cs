@@ -43,7 +43,7 @@ namespace WhosWatching
             double elapsed = Time.realtimeSinceStartupAsDouble - start;
             var manager = NetworkManager.Singleton;
             var player = manager.LocalClient?.PlayerObject?.GetComponent<NetworkPlayer>();
-            if (manager.SpawnManager != null && manager.SpawnManager.SpawnedObjects.Count == expected) sawPopulation = true;
+            if (NetworkGameManager.Instance.Gaze.Players.Count == expected) sawPopulation = true;
             if (player != null && elapsed >= next)
             {
                 next = elapsed + 0.05;
