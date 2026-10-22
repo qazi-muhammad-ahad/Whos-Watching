@@ -25,7 +25,7 @@ namespace WhosWatching
             Cursor.lockState=CursorLockMode.Locked;
             yield return new WaitForSeconds(2);yield return Capture("UI-HUD.png");
             GameUI.Details=false;yield return new WaitForSeconds(0.5f);yield return Capture("UI-Essentials.png");
-            ArenaGameplay.Instance.Winner.Value=TeamId.A;ArenaGameplay.Instance.Finished.Value=true;
+            ArenaGameplay.Instance.Winner.Value=TeamId.A;ArenaGameplay.Instance.Finished.Value=true;Cursor.lockState=CursorLockMode.Locked;
             yield return new WaitForSeconds(0.5f);yield return Capture("UI-Results.png");
             GameUI.Details=original;Debug.Log("WW_UI_PREVIEW_PASS");Application.Quit();
         }

@@ -264,21 +264,26 @@ namespace WhosWatching
                 {
                     float x=GameUI.Width/2-300;int remaining=Mathf.Max(0,Mathf.CeilToInt((float)(EndsAt.Value-NetworkManager.ServerTime.Time)));
                     GameUI.Card(new Rect(x,20,600,90));
+                    GameUI.Fill(new Rect(x,20,600,3),GameUI.Mint,false);
                     GameUI.Fill(new Rect(x+12,30,150,69),Color.Lerp(TeamLobby.Instance.Color(TeamId.A),GameUI.Ink,0.3f));
                     GameUI.Fill(new Rect(x+438,30,150,69),Color.Lerp(TeamLobby.Instance.Color(TeamId.B),GameUI.Ink,0.3f));
                     GUI.Label(new Rect(x+12,36,150,55),$"TEAM A\n{Score(TeamId.A)} BUILT",GameUI.Center);
                     GUI.Label(new Rect(x+438,36,150,55),$"TEAM B\n{Score(TeamId.B)} BUILT",GameUI.Center);
-                    GUI.Label(new Rect(x+164,24,272,52),$"{remaining/60:00}:{remaining%60:00}",GameUI.Title);
-                    GUI.Label(new Rect(x+164,76,272,25),Overtime.Value?"SUDDEN-DEATH OVERTIME":"RACE TO THE MIDDLE",GameUI.Small);
+                    GUI.Label(new Rect(x+164,23,272,50),$"{remaining/60:00}:{remaining%60:00}",GameUI.Display);
+                    GUI.Label(new Rect(x+164,70,272,22),Overtime.Value?"SUDDEN-DEATH OVERTIME":"RACE TO THE MIDDLE",GameUI.Center);
                 }
                 if(Finished.Value)
                 {
-                    GameUI.Fill(new Rect(0,0,GameUI.Width,GameUI.Height),new Color(0.035f,0.045f,0.10f,0.75f),false);
-                    float x=GameUI.Width/2-270,y=GameUI.Height/2-125;GameUI.Card(new Rect(x,y,540,250));
-                    GUI.Label(new Rect(x+20,y+22,500,30),"THAT'S A WRAP!",GameUI.Center);
-                    GUI.Label(new Rect(x+20,y+62,500,65),Winner.Value==TeamId.None?"IT'S A DRAW!":$"TEAM {Winner.Value} WINS!",GameUI.Title);
-                    GUI.Label(new Rect(x+24,y+137,492,35),Winner.Value==TeamId.None?"Three minutes of overtime. Equally mischievous.":"A little teamwork goes a long way.",GameUI.Center);
-                    GUI.Label(new Rect(x+24,y+190,492,40),"Host: use BACK TO LOBBY to play again.",GameUI.Small);
+                    GameUI.Fill(new Rect(0,0,GameUI.Width,GameUI.Height),new Color(0.015f,0.035f,0.065f,0.78f),false);
+                      float x=GameUI.Width/2-300,y=GameUI.Height/2-160;GameUI.Card(new Rect(x,y,600,320));
+                    GameUI.Fill(new Rect(x,y,600,4),Winner.Value==TeamId.None?GameUI.Mint:GameUI.Gold,false);
+                    GUI.Label(new Rect(x+30,y+27,540,28),"ROUND COMPLETE",GameUI.Center);
+                    GUI.Label(new Rect(x+30,y+65,540,60),Winner.Value==TeamId.None?"IT'S A DRAW!":$"TEAM {Winner.Value} WINS!",GameUI.Display);
+                    GUI.Label(new Rect(x+40,y+139,520,42),Winner.Value==TeamId.None?"Three minutes of overtime. Equally mischievous.":"A little teamwork goes a long way.",GameUI.Center);
+                      if(NetworkManager.IsServer && GameUI.Button(new Rect(x+35,y+252,260,46),"BACK TO LOBBY",GameUI.Gold))
+                          TeamLobby.Instance.ReturnToLobby();
+                      if(GameUI.Button(new Rect(NetworkManager.IsServer?x+305:x+170,y+252,260,46),"LEAVE MATCH",GameUI.Cream))
+                          NetworkGameManager.Instance.Stop();
                 }
             }
         }

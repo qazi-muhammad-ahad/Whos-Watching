@@ -289,21 +289,25 @@ namespace WhosWatching
             {
                 GameUI.Reticle();if(!GameUI.Details)return;
                 var state=Gaze.Value;var arena=ArenaGameplay.Instance;
-                float y=GameUI.Height-146;
-                GameUI.Card(new Rect(24,y,300,122));
-                GUILayout.BeginArea(new Rect(40,y+10,268,106));
+                float y=GameUI.Height-150;
+                GameUI.Card(new Rect(24,y,300,136));
+                GUILayout.BeginArea(new Rect(40,y+9,268,118));
                 GUILayout.Label($"{DisplayName.Value}  /  TEAM {Team.Value}",GameUI.Heading);
                 GUILayout.Label($"{state.Allies} CHEERING YOU ON   /   {state.Enemies} WATCHING",GameUI.Small);
                 GUILayout.Label($"MOVE {state.Move:F1}x   WORK {state.Work:F1}x   PUNCH {PunchMultiplier:F1}x",GameUI.Small);
                 GUILayout.Label($"Supporting {state.OutgoingAllies}  /  Disrupting {state.OutgoingEnemies}",GameUI.Small);
                 GUILayout.EndArea();
-                GameUI.Card(new Rect(GameUI.Width/2-225,y+14,450,108));
+                GameUI.Card(new Rect(GameUI.Width/2-225,y+7,450,108));
                 bool carrying=arena && arena.Carrying(this)>=0;
-                GUI.Label(new Rect(GameUI.Width/2-210,y+21,420,28),Working.Value?"KEEP GOING!":carrying?"SPECIAL DELIVERY!":"MAKE YOUR MOVE",GameUI.Center);
-                GUI.Label(new Rect(GameUI.Width/2-210,y+53,420,24),carrying?"Hold E at your checkpoint  /  Q returns crate":"F picks up a crate  /  hold E to sabotage",GameUI.Small);
-                GameUI.Fill(new Rect(GameUI.Width/2-206,y+88,412,10),GameUI.Ink);
-                if(WorkProgress.Value>0)GameUI.Fill(new Rect(GameUI.Width/2-206,y+88,412*Mathf.Clamp01(WorkProgress.Value),10),GameUI.Gold);
-                GUI.Label(new Rect(GameUI.Width-260,GameUI.Height-64,236,44),"H  HUD ON/OFF   /   ESC  MENU\nSPACE  JUMP   /   CLICK  PUNCH",GameUI.Small);
+                GUI.Label(new Rect(GameUI.Width/2-210,y+13,420,26),Working.Value?"KEEP GOING!":carrying?"SPECIAL DELIVERY!":"MAKE YOUR MOVE",GameUI.Center);
+                GUI.Label(new Rect(GameUI.Width/2-210,y+42,420,24),carrying?"Hold E at your checkpoint  /  Q returns crate":"F picks up a crate  /  hold E to sabotage",GameUI.Small);
+                GameUI.Fill(new Rect(GameUI.Width/2-206,y+81,412,10),GameUI.Ink);
+                if(WorkProgress.Value>0)GameUI.Fill(new Rect(GameUI.Width/2-206,y+81,412*Mathf.Clamp01(WorkProgress.Value),10),GameUI.Gold);
+                GameUI.Card(new Rect(GameUI.Width-224,y,200,136));
+                GUILayout.BeginArea(new Rect(GameUI.Width-208,y+9,168,118));
+                  GUILayout.Label("CONTROLS",GameUI.Heading);
+                  GUILayout.Label("H  HUD   /   ESC  PAUSE\nSPACE  JUMP   /   CLICK  PUNCH",GameUI.Small);
+                GUILayout.EndArea();
             }
         }
         void DrawNameplate()
