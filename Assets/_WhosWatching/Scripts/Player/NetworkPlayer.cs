@@ -97,8 +97,10 @@ namespace WhosWatching
                 direction = new Vector2((keyboard.dKey.isPressed ? 1 : 0) - (keyboard.aKey.isPressed ? 1 : 0),
                     (keyboard.wKey.isPressed ? 1 : 0) - (keyboard.sKey.isPressed ? 1 : 0));
                 var delta = mouse.delta.ReadValue();
-                yaw = Mathf.Repeat(yaw + delta.x * 0.12f, 360);
-                pitch = Mathf.Clamp(pitch - delta.y * 0.12f, -80, 80);
+                float sens = GameSettings.MouseSensitivity;
+                float ySign = GameSettings.InvertY ? 1f : -1f;
+                yaw = Mathf.Repeat(yaw + delta.x * sens, 360);
+                pitch = Mathf.Clamp(pitch + delta.y * sens * ySign, -80, 80);
             }
             if (Time.unscaledTimeAsDouble >= nextSend)
             {
@@ -287,26 +289,82 @@ namespace WhosWatching
             if (!IsOwner) { DrawNameplate(); return; }
             using (GameUI.Begin())
             {
-                GameUI.Reticle();if(!GameUI.Details)return;
-                var state=Gaze.Value;var arena=ArenaGameplay.Instance;
-                float y=GameUI.Height-150;
-                GameUI.Card(new Rect(24,y,300,136));
-                GUILayout.BeginArea(new Rect(40,y+9,268,118));
-                GUILayout.Label($"{DisplayName.Value}  /  TEAM {Team.Value}",GameUI.Heading);
-                GUILayout.Label($"{state.Allies} CHEERING YOU ON   /   {state.Enemies} WATCHING",GameUI.Small);
-                GUILayout.Label($"MOVE {state.Move:F1}x   WORK {state.Work:F1}x   PUNCH {PunchMultiplier:F1}x",GameUI.Small);
-                GUILayout.Label($"Supporting {state.OutgoingAllies}  /  Disrupting {state.OutgoingEnemies}",GameUI.Small);
+                var arena = ArenaGameplay.Instance;
+
+                // Interactive target detection for dynamic reticle
+                bool interactiveAim = false;
+                if (arena != null)
+                {
+                    for (int i = 0; i < arena.Checkpoints.Length; i++)
+                    {
+                        if (arena.CanReach(this, arena.Checkpoints[i].position + Vector3.up * 0.6f, arena.Checkpoints[i]))
+                        { interactiveAim = true; break; }
+                    }
+                    if (!interactiveAim)
+                    {
+                        for (int i = 0; i < arena.Crates.Count; i++)
+                        {
+                            if (arena.Crates[i].Active && arena.Crates[i].Carrier == ArenaCrate.Nobody && arena.CanReach(this, arena.CrateHomes[i] + Vector3.up * 0.35f))
+                            { interactiveAim = true; break; }
+                        }
+                    }
+                }
+
+                GameUI.Reticle(interactiveAim);
+
+                // Draw intelligent objective guidance
+                ObjectiveGuidance.Instance?.DrawGUI(View);
+
+                if (!GameUI.Details) return;
+
+                var state = Gaze.Value;
+                float y = GameUI.Height - 150;
+
+                // PLAYER STATUS CARD (BOTTOM LEFT)
+                GameUI.Card(new Rect(24, y, 310, 136));
+                Color teamColor = TeamLobby.Instance ? TeamLobby.Instance.Color(Team.Value) : GameUI.Mint;
+                GameUI.Fill(new Rect(24, y, 6, 136), teamColor, false);
+
+                GUILayout.BeginArea(new Rect(42, y + 10, 280, 118));
+                string charName = Character.Value == CharacterId.Ghost ? "GHOST" : "DEVIL";
+                GUILayout.Label($"{DisplayName.Value}  •  {charName} (TEAM {Team.Value})", GameUI.Heading);
+
+                // Gaze stats with vibrant badges
+                string cheerText = state.Allies > 0 ? $"★ {state.Allies} CHEERING YOU ON!" : "0 allies watching";
+                string stareText = state.Enemies > 0 ? $"⚠ {state.Enemies} WATCHING YOU" : "0 enemies watching";
+                GUILayout.Label($"{cheerText}   /   {stareText}", GameUI.Small);
+                GUILayout.Label($"MOVE {state.Move:F1}x   •   WORK {state.Work:F1}x   •   PUNCH {PunchMultiplier:F1}x", GameUI.BoldLabel);
+                GUILayout.Label($"Looking at: {state.OutgoingAllies} ally  •  {state.OutgoingEnemies} enemy", GameUI.Small);
                 GUILayout.EndArea();
-                GameUI.Card(new Rect(GameUI.Width/2-225,y+7,450,108));
-                bool carrying=arena && arena.Carrying(this)>=0;
-                GUI.Label(new Rect(GameUI.Width/2-210,y+13,420,26),Working.Value?"KEEP GOING!":carrying?"SPECIAL DELIVERY!":"MAKE YOUR MOVE",GameUI.Center);
-                GUI.Label(new Rect(GameUI.Width/2-210,y+42,420,24),carrying?"Hold E at your checkpoint  /  Q returns crate":"F picks up a crate  /  hold E to sabotage",GameUI.Small);
-                GameUI.Fill(new Rect(GameUI.Width/2-206,y+81,412,10),GameUI.Ink);
-                if(WorkProgress.Value>0)GameUI.Fill(new Rect(GameUI.Width/2-206,y+81,412*Mathf.Clamp01(WorkProgress.Value),10),GameUI.Gold);
-                GameUI.Card(new Rect(GameUI.Width-224,y,200,136));
-                GUILayout.BeginArea(new Rect(GameUI.Width-208,y+9,168,118));
-                  GUILayout.Label("CONTROLS",GameUI.Heading);
-                  GUILayout.Label("H  HUD   /   ESC  PAUSE\nSPACE  JUMP   /   CLICK  PUNCH",GameUI.Small);
+
+                // CENTER ACTION / WORK PROGRESS CARD
+                float centerW = 460, centerH = 110;
+                float centerX = GameUI.Width * 0.5f - centerW * 0.5f;
+                GameUI.Card(new Rect(centerX, y + 10, centerW, centerH));
+
+                bool carrying = arena && arena.Carrying(this) >= 0;
+                string promptTitle = Working.Value ? "KEEP GOING! WORKING..." : carrying ? "SPECIAL DELIVERY!" : "READY FOR ACTION!";
+                Color promptAccent = Working.Value ? GameUI.Gold : carrying ? GameUI.Mint : GameUI.Cream;
+                GameUI.Fill(new Rect(centerX, y + 10, centerW, 3), promptAccent, false);
+
+                GUI.Label(new Rect(centerX + 10, y + 16, centerW - 20, 26), promptTitle, GameUI.Heading);
+
+                string promptSub = Working.Value ? "Holding [E] to build/sabotage station" :
+                                   carrying ? "Deliver to your station [Hold E]   •   [Q] Drop crate" :
+                                   "Walk to crate [F] to pick up   •   Hold [E] to sabotage enemy";
+                GUI.Label(new Rect(centerX + 10, y + 44, centerW - 20, 22), promptSub, GameUI.Small);
+
+                // Animated Work Progress Bar
+                Rect progRect = new Rect(centerX + 16, y + 74, centerW - 32, 18);
+                string progText = WorkProgress.Value > 0 ? $"{Mathf.RoundToInt(WorkProgress.Value * 100)}%" : "";
+                GameUI.ProgressBar(progRect, WorkProgress.Value, GameUI.Gold, progText);
+
+                // CONTROLS CARD (BOTTOM RIGHT)
+                float ctrlW = 210;
+                GameUI.Card(new Rect(GameUI.Width - ctrlW - 24, y, ctrlW, 136));
+                GUILayout.BeginArea(new Rect(GameUI.Width - ctrlW - 10, y + 10, ctrlW - 20, 118));
+                GUILayout.Label("CONTROLS", GameUI.Heading);
+                GUILayout.Label("[WASD] MOVE     [SPACE] JUMP\n[F] PICK UP     [Q] DROP\n[E] HOLD WORK   [CLICK] PUNCH\n[ESC] PAUSE     [H] HUD MODE", GameUI.Small);
                 GUILayout.EndArea();
             }
         }

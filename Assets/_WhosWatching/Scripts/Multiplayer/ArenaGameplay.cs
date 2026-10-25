@@ -258,32 +258,76 @@ namespace WhosWatching
         void OnGUI()
         {
             if (!IsSpawned || !TeamLobby.Instance.Playing.Value) return;
-            using(GameUI.Begin())
+            using (GameUI.Begin())
             {
-                if(!Finished.Value)
+                if (!Finished.Value)
                 {
-                    float x=GameUI.Width/2-300;int remaining=Mathf.Max(0,Mathf.CeilToInt((float)(EndsAt.Value-NetworkManager.ServerTime.Time)));
-                    GameUI.Card(new Rect(x,20,600,90));
-                    GameUI.Fill(new Rect(x,20,600,3),GameUI.Mint,false);
-                    GameUI.Fill(new Rect(x+12,30,150,69),Color.Lerp(TeamLobby.Instance.Color(TeamId.A),GameUI.Ink,0.3f));
-                    GameUI.Fill(new Rect(x+438,30,150,69),Color.Lerp(TeamLobby.Instance.Color(TeamId.B),GameUI.Ink,0.3f));
-                    GUI.Label(new Rect(x+12,36,150,55),$"TEAM A\n{Score(TeamId.A)} BUILT",GameUI.Center);
-                    GUI.Label(new Rect(x+438,36,150,55),$"TEAM B\n{Score(TeamId.B)} BUILT",GameUI.Center);
-                    GUI.Label(new Rect(x+164,23,272,50),$"{remaining/60:00}:{remaining%60:00}",GameUI.Display);
-                    GUI.Label(new Rect(x+164,70,272,22),Overtime.Value?"SUDDEN-DEATH OVERTIME":"RACE TO THE MIDDLE",GameUI.Center);
+                    float w = 620, h = 60;
+                    float x = GameUI.Width * 0.5f - w * 0.5f;
+                    int remaining = Mathf.Max(0, Mathf.CeilToInt((float)(EndsAt.Value - NetworkManager.ServerTime.Time)));
+                    bool isUrgent = remaining < 60 || Overtime.Value;
+
+                    // Modern cartoon floating scoreboard
+                    GameUI.Card(new Rect(x, 16, w, h));
+                    GameUI.Fill(new Rect(x, 16, w, 3), isUrgent ? GameUI.Coral : GameUI.Mint, false);
+
+                    // Team A capsule
+                    Color colA = TeamLobby.Instance.Color(TeamId.A);
+                    GameUI.Card(new Rect(x + 10, 22, 160, 48), Color.Lerp(colA, GameUI.Ink, 0.4f));
+                    GameUI.Fill(new Rect(x + 10, 22, 6, 48), colA, false);
+                    GUI.Label(new Rect(x + 22, 26, 140, 22), "TEAM A", GameUI.BoldLabel);
+                    GUI.Label(new Rect(x + 22, 46, 140, 20), $"{Score(TeamId.A)} BUILT", GameUI.Small);
+
+                    // Team B capsule
+                    Color colB = TeamLobby.Instance.Color(TeamId.B);
+                    GameUI.Card(new Rect(x + w - 170, 22, 160, 48), Color.Lerp(colB, GameUI.Ink, 0.4f));
+                    GameUI.Fill(new Rect(x + w - 170, 22, 6, 48), colB, false);
+                    GUI.Label(new Rect(x + w - 158, 26, 140, 22), "TEAM B", GameUI.BoldLabel);
+                    GUI.Label(new Rect(x + w - 158, 46, 140, 20), $"{Score(TeamId.B)} BUILT", GameUI.Small);
+
+                    // Center Round Timer & Subtitle
+                    Color timeColor = isUrgent ? (Mathf.Sin(Time.time * 8f) > 0 ? GameUI.Coral : GameUI.Gold) : GameUI.Cream;
+                    GUI.color = timeColor;
+                    GUI.Label(new Rect(x + 180, 18, 260, 36), $"{remaining / 60:00}:{remaining % 60:00}", GameUI.Display);
+                    GUI.color = Color.white;
+
+                    string modeTitle = Overtime.Value ? "★ SUDDEN-DEATH OVERTIME ★" : "RACE TO THE CROWN";
+                    GUI.Label(new Rect(x + 180, 52, 260, 20), modeTitle, GameUI.Center);
                 }
-                if(Finished.Value)
+
+                if (Finished.Value)
                 {
-                    GameUI.Fill(new Rect(0,0,GameUI.Width,GameUI.Height),new Color(0.015f,0.035f,0.065f,0.78f),false);
-                      float x=GameUI.Width/2-300,y=GameUI.Height/2-160;GameUI.Card(new Rect(x,y,600,320));
-                    GameUI.Fill(new Rect(x,y,600,4),Winner.Value==TeamId.None?GameUI.Mint:GameUI.Gold,false);
-                    GUI.Label(new Rect(x+30,y+27,540,28),"ROUND COMPLETE",GameUI.Center);
-                    GUI.Label(new Rect(x+30,y+65,540,60),Winner.Value==TeamId.None?"IT'S A DRAW!":$"TEAM {Winner.Value} WINS!",GameUI.Display);
-                    GUI.Label(new Rect(x+40,y+139,520,42),Winner.Value==TeamId.None?"Three minutes of overtime. Equally mischievous.":"A little teamwork goes a long way.",GameUI.Center);
-                      if(NetworkManager.IsServer && GameUI.Button(new Rect(x+35,y+252,260,46),"BACK TO LOBBY",GameUI.Gold))
-                          TeamLobby.Instance.ReturnToLobby();
-                      if(GameUI.Button(new Rect(NetworkManager.IsServer?x+305:x+170,y+252,260,46),"LEAVE MATCH",GameUI.Cream))
-                          NetworkGameManager.Instance.Stop();
+                    // Dark celebration vignette
+                    GameUI.Fill(new Rect(0, 0, GameUI.Width, GameUI.Height), new Color(0.015f, 0.035f, 0.065f, 0.85f), false);
+                    float w = 620, h = 420;
+                    float x = GameUI.Width * 0.5f - w * 0.5f, y = GameUI.Height * 0.5f - h * 0.5f;
+
+                    GameUI.Card(new Rect(x, y, w, h));
+                    GameUI.Fill(new Rect(x, y, w, 4), Winner.Value == TeamId.None ? GameUI.Mint : GameUI.Gold, false);
+
+                    // Draw Logo on top of result card
+                    GameUI.DrawLogo(new Rect(x + w * 0.5f - 140, y + 16, 280, 64));
+
+                    GUI.Label(new Rect(x + 20, y + 84, w - 40, 26), "ROUND COMPLETE", GameUI.Overline);
+                    string winText = Winner.Value == TeamId.None ? "IT'S A DRAW!" : $"TEAM {Winner.Value} WINS!";
+                    GUI.Label(new Rect(x + 20, y + 108, w - 40, 56), winText, GameUI.Display);
+
+                    string subText = Winner.Value == TeamId.None ?
+                        "Three minutes of overtime. Both sides equally mischievous!" :
+                        "Incredible teamwork and watchful coordination took the crown!";
+                    GUI.Label(new Rect(x + 30, y + 168, w - 60, 40), subText, GameUI.Center);
+
+                    // Scoreboard recap card
+                    float scoreCardW = 400;
+                    GameUI.Card(new Rect(x + w * 0.5f - scoreCardW * 0.5f, y + 215, scoreCardW, 70), GameUI.PanelLight);
+                    GUI.Label(new Rect(x + w * 0.5f - scoreCardW * 0.5f, y + 225, scoreCardW, 24), $"FINAL SCORE: TEAM A [{Score(TeamId.A)}]  vs  TEAM B [{Score(TeamId.B)}]", GameUI.BoldLabel);
+                    GUI.Label(new Rect(x + w * 0.5f - scoreCardW * 0.5f, y + 250, scoreCardW, 22), Overtime.Value ? "Decided in Overtime" : "Regulation Match", GameUI.Small);
+
+                    float btnY = y + 330;
+                    if (NetworkManager.IsServer && GameUI.Button(new Rect(x + 35, btnY, 260, 48), "BACK TO LOBBY", GameUI.Gold))
+                        TeamLobby.Instance.ReturnToLobby();
+                    if (GameUI.Button(new Rect(NetworkManager.IsServer ? x + 325 : x + 180, btnY, 260, 48), "LEAVE MATCH", GameUI.Cream))
+                        NetworkGameManager.Instance.Stop();
                 }
             }
         }
