@@ -40,6 +40,18 @@ namespace WhosWatching
         static GUIStyle subtitleStyle, tagline, modernInputStyle;
         static bool? details;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        public static void ReloadTextures()
+        {
+            skin = null;
+            flat = null;
+            logoTexture = null;
+            titleTexture = null;
+            btnStartTexture = null;
+            btnSettingsTexture = null;
+            btnHowTexture = null;
+        }
+
         public static bool Details
         {
             get => details ??= PlayerPrefs.GetInt("WW.DetailedHUD", 1) != 0;

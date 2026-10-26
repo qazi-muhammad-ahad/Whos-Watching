@@ -11,6 +11,9 @@
     "com.unity.modules.imageconversion": "1.0.0",
     "com.unity.modules.imgui": "1.0.0",
     "com.unity.modules.physics": "1.0.0",
-    "com.unity.modules.ui": "1.0.0"
+    "com.unity.modules.ui": "1.0.0",
+    "com.unity.services.core": "1.18.0",
+    "com.unity.services.authentication": "3.8.1",
+    "com.unity.services.relay": "1.2.0"
   }
 }

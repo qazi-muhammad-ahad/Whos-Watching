@@ -1,13 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using Unity.Networking.Transport.Relay;
+using Unity.Services.Core;
+using Unity.Services.Authentication;
+using Unity.Services.Relay;
+using Unity.Services.Relay.Models;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace WhosWatching
 {
-    // LAN session manager with console-quality title screen, lobby, settings, and how-to-play.
+    // Online & LAN session manager with console-quality title screen, lobby, settings, and how-to-play.
     public sealed class NetworkGameManager : MonoBehaviour
     {
         public NetworkManager Network;
@@ -19,9 +25,15 @@ namespace WhosWatching
         Vector2 lobbyScroll, settingsScroll, htpScroll;
         string address = "127.0.0.1", port = "7777";
         readonly Dictionary<ulong, double> reservations = new();
-        bool connecting, stopping;
+        bool connecting, stopping, isPreparingRelay;
         double deadline;
         public static NetworkGameManager Instance { get; private set; }
+
+        // Online Relay & Dedicated Server state
+        string relayJoinCode = "";
+        string inputRelayCode = "";
+        bool usingRelay = false;
+        int networkModeTab = 0; // 0 = Online Room Code (Relay), 1 = Direct IP / Server
 
         // 0=Title, 1=Lobby, 2=Settings, 3=HowToPlay
         int screen = 0;
@@ -44,6 +56,12 @@ namespace WhosWatching
             Network.ConnectionApprovalCallback += Approve;
             Network.OnClientConnectedCallback += Connected;
             Network.OnClientDisconnectCallback += Disconnected;
+
+            string[] args = Environment.GetCommandLineArgs();
+            if (Array.IndexOf(args, "-batchmode") >= 0 || Array.IndexOf(args, "-server") >= 0)
+            {
+                StartDedicatedServer();
+            }
         }
 
         void OnDestroy()
@@ -87,7 +105,17 @@ namespace WhosWatching
         {
             reservations.Remove(id);
             if (id == Network.LocalClientId)
-            { connecting = false; Status = "Connected — choose your character and ready up"; }
+            {
+                connecting = false;
+                if (usingRelay && !string.IsNullOrEmpty(relayJoinCode))
+                {
+                    Status = $"Online Room Ready! Code: {relayJoinCode}";
+                }
+                else
+                {
+                    Status = "Connected — choose your character and ready up";
+                }
+            }
             Debug.Log($"WW_CONNECTED id={id}");
         }
 
@@ -97,18 +125,27 @@ namespace WhosWatching
             Debug.Log($"WW_DISCONNECTED id={id}");
             if (!Network.IsServer || id == Network.LocalClientId)
             {
-                Status = string.IsNullOrEmpty(Network.DisconnectReason) ? "Disconnected." : Network.DisconnectReason;
+                if (string.IsNullOrEmpty(Network.DisconnectReason))
+                {
+                    Status = usingRelay ? "Disconnected from online room." : "Disconnected from session.";
+                }
+                else
+                {
+                    Status = Network.DisconnectReason;
+                }
                 Stop(false);
             }
         }
 
         public void StartSession(bool host, string ip = null, string portText = null)
         {
-            if (Network.IsListening || Network.ShutdownInProgress || connecting || stopping) return;
+            if (Network.IsListening || Network.ShutdownInProgress || connecting || stopping || isPreparingRelay) return;
             PlayerPrefs.Save();
+            usingRelay = false;
+            relayJoinCode = "";
             address = ip ?? address; port = portText ?? port;
             if (!SessionRules.Endpoint(address, port, out var number))
-            { Status = "Enter a valid IPv4 address and port 1–65535."; return; }
+            { Status = "Enter a valid IP/domain and port 1–65535."; return; }
             try
             {
                 Network.GetComponent<UnityTransport>().SetConnectionData(address, number, host ? "0.0.0.0" : null);
@@ -117,22 +154,159 @@ namespace WhosWatching
                 if (Array.IndexOf(Environment.GetCommandLineArgs(), "-wwBadToken") >= 0)
                     Network.NetworkConfig.ConnectionData = new byte[] { 0 };
 #endif
-                connecting = true; deadline = Time.realtimeSinceStartupAsDouble + 10;
-                Status = host ? "Hosting..." : "Connecting...";
+                connecting = true; deadline = Time.realtimeSinceStartupAsDouble + 12;
+                Status = host ? "Hosting Server..." : "Connecting to Server...";
                 bool started = host ? Network.StartHost() : Network.StartClient();
                 if (!started) { Status = "Could not start transport. Check port availability."; Stop(false); }
             }
             catch (Exception ex) { Status = "Connection failed: " + ex.Message; Stop(false); }
         }
 
+        public async void StartRelayHost()
+        {
+            if (Network.IsListening || Network.ShutdownInProgress || connecting || stopping || isPreparingRelay) return;
+            PlayerPrefs.Save();
+            isPreparingRelay = true;
+            usingRelay = true;
+            Status = "Connecting to Unity Gaming Services...";
+            try
+            {
+                if (UnityServices.State != ServicesInitializationState.Initialized)
+                {
+                    await UnityServices.InitializeAsync();
+                }
+                if (!AuthenticationService.Instance.IsSignedIn)
+                {
+                    Status = "Signing in anonymously...";
+                    await AuthenticationService.Instance.SignInAnonymouslyAsync();
+                }
+                Status = "Creating online room...";
+                // 3 client slots (host + 3 = 4 players max)
+                Allocation allocation = await RelayService.Instance.CreateAllocationAsync(3);
+                relayJoinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
+                Debug.Log($"[Who's Watching] Relay Join Code Created: {relayJoinCode}");
+
+                var transport = Network.GetComponent<UnityTransport>();
+                var relayServerData = new RelayServerData(allocation, "udp");
+                transport.SetRelayServerData(relayServerData);
+
+                Network.NetworkConfig.ConnectionData = SessionRules.Payload;
+                connecting = true;
+                deadline = Time.realtimeSinceStartupAsDouble + 25.0;
+                Status = $"Online Room Ready! Code: {relayJoinCode}";
+                bool started = Network.StartHost();
+                if (!started)
+                {
+                    Status = "Failed to start Relay Host. Check internet connection.";
+                    Stop(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("StartRelayHost exception: " + ex.Message);
+                Status = "Relay error: " + ex.Message;
+                connecting = false;
+                usingRelay = false;
+            }
+            finally
+            {
+                isPreparingRelay = false;
+            }
+        }
+
+        public async void StartRelayClient(string code = null)
+        {
+            if (Network.IsListening || Network.ShutdownInProgress || connecting || stopping || isPreparingRelay) return;
+            PlayerPrefs.Save();
+            string targetCode = (code ?? inputRelayCode).Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(targetCode) || targetCode.Length < 6)
+            {
+                Status = "Please enter a valid 6-character room code.";
+                return;
+            }
+            isPreparingRelay = true;
+            usingRelay = true;
+            Status = "Connecting to Unity Gaming Services...";
+            try
+            {
+                if (UnityServices.State != ServicesInitializationState.Initialized)
+                {
+                    await UnityServices.InitializeAsync();
+                }
+                if (!AuthenticationService.Instance.IsSignedIn)
+                {
+                    Status = "Signing in anonymously...";
+                    await AuthenticationService.Instance.SignInAnonymouslyAsync();
+                }
+                Status = $"Finding room {targetCode}...";
+                JoinAllocation joinAlloc = await RelayService.Instance.JoinAllocationAsync(targetCode);
+
+                var transport = Network.GetComponent<UnityTransport>();
+                var relayServerData = new RelayServerData(joinAlloc, "udp");
+                transport.SetRelayServerData(relayServerData);
+
+                Network.NetworkConfig.ConnectionData = SessionRules.Payload;
+                connecting = true;
+                deadline = Time.realtimeSinceStartupAsDouble + 25.0;
+                relayJoinCode = targetCode;
+                Status = $"Joining Room {targetCode}...";
+                bool started = Network.StartClient();
+                if (!started)
+                {
+                    Status = "Failed to connect to room. Check code & retry.";
+                    Stop(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("StartRelayClient exception: " + ex.Message);
+                Status = "Relay error: " + ex.Message;
+                connecting = false;
+                usingRelay = false;
+            }
+            finally
+            {
+                isPreparingRelay = false;
+            }
+        }
+
+        public void StartDedicatedServer(ushort serverPort = 7777)
+        {
+            try
+            {
+                usingRelay = false;
+                relayJoinCode = "";
+                Network.GetComponent<UnityTransport>().SetConnectionData("0.0.0.0", serverPort);
+                Network.NetworkConfig.ConnectionData = SessionRules.Payload;
+                Debug.Log($"[Who's Watching] Dedicated Server starting on 0.0.0.0:{serverPort}");
+                bool ok = Network.StartServer();
+                Status = ok ? $"Dedicated Server running on port {serverPort}" : "Failed to start server.";
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[Who's Watching] Dedicated server error: {ex.Message}");
+                Status = "Server error: " + ex.Message;
+            }
+        }
+
         public void Stop(bool user = true)
         {
-            if (user) Status = "Left session.";
-            connecting = false; stopping = true;
+            if (user)
+            {
+                Status = "Left session.";
+                usingRelay = false;
+                relayJoinCode = "";
+            }
+            connecting = false;
+            stopping = true;
+            isPreparingRelay = false;
             pauseSettingsOpen = false;
-            screen = 0;
+            // CRITICAL: NEVER kick the player to the main title screen (screen 0) on disconnect or error.
+            // Keep them on the lobby screen (screen 1) so they can see the error, room code, or retry.
+            if (screen != 0) screen = 1;
             Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
-            if (!Network.ShutdownInProgress) Network.Shutdown();
+            if (Network != null && !Network.ShutdownInProgress && Network.IsListening)
+                Network.Shutdown();
         }
 
         void Update()
@@ -150,7 +324,7 @@ namespace WhosWatching
                 bool inMatch = lobby && lobby.IsSpawned && lobby.Playing.Value;
                 if (!inMatch && screen != 0)
                 {
-                    if (screen == 1 && (Network.IsListening || connecting)) Stop();
+                    if (screen == 1 && (Network.IsListening || connecting || isPreparingRelay)) Stop();
                     screen = 0;
                 }
             }
@@ -298,8 +472,10 @@ namespace WhosWatching
             // Clean centered logo at top center
             GameUI.DrawLogo(new Rect(W * 0.5f - 160, 10, 320, 52), false);
 
-            // Top-right LAN status badge
-            float statW = 180, statH = 38;
+            // Top-right status badge
+            bool showRoom = !string.IsNullOrEmpty(relayJoinCode);
+            float statW = showRoom ? 280 : 180;
+            float statH = 38;
             Rect rStat = new Rect(W - statW - 28, 18, statW, statH);
             GameUI.Fill(new Rect(rStat.x + 2, rStat.y + 2, rStat.width, rStat.height), new Color(0, 0, 0, 0.45f), false);
             GameUI.Fill(rStat, new Color(0.02f, 0.04f, 0.08f, 0.88f), false);
@@ -307,7 +483,19 @@ namespace WhosWatching
             GameUI.Fill(new Rect(rStat.x + 14, rStat.y + 14, 10, 10), GameUI.Mint, false);
             var statStyle = new GUIStyle(GameUI.BoldLabel) { fontSize = 12, alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Overflow };
             statStyle.normal.textColor = GameUI.Cream;
-            GUI.Label(new Rect(rStat.x + 32, rStat.y + 9, rStat.width - 36, 20), "LAN MULTIPLAYER", statStyle);
+            if (showRoom)
+            {
+                GUI.Label(new Rect(rStat.x + 32, rStat.y + 9, rStat.width - 110, 20), $"ROOM: {relayJoinCode}", statStyle);
+                if (GameUI.ModernButton(new Rect(rStat.xMax - 75, rStat.y + 4, 70, 30), "COPY", GameUI.Mint))
+                {
+                    GUIUtility.systemCopyBuffer = relayJoinCode;
+                    Status = $"Room code {relayJoinCode} copied to clipboard!";
+                }
+            }
+            else
+            {
+                GUI.Label(new Rect(rStat.x + 32, rStat.y + 9, rStat.width - 36, 20), Network.IsListening ? "DIRECT / LAN" : "ONLINE MULTIPLAYER", statStyle);
+            }
 
             // 3. Two Main Modern Glass Cards (Left: Session / Crew, Right: Objectives & Roster)
             float totalW = 1040;
@@ -401,49 +589,110 @@ namespace WhosWatching
             }
             cy += 68;
 
-            // Section 3: HOST A GAME
-            GUI.Label(new Rect(cx, cy, cw, 20), "3. HOST A GAME (LAN)", GameUI.Overline); cy += 24;
-            Rect rHost = new Rect(cx, cy, cw, 46);
-            if (GameUI.ModernButton(rHost, "HOST A GAME  (LAN)", GameUI.HotOrange))
+            // Section 3: Connection Mode Selector
+            GUI.Label(new Rect(cx, cy, cw, 20), "3. CONNECTION MODE", GameUI.Overline); cy += 22;
+            float tabBtnW = (cw - 10) * 0.5f;
+            if (GameUI.ModernButton(new Rect(cx, cy, tabBtnW, 36), "ONLINE ROOM (CODE)", networkModeTab == 0 ? GameUI.Mint : GameUI.PanelLight))
             {
-                StartSession(true);
+                networkModeTab = 0;
             }
-            cy += 56;
-
-            // Section 4: DIRECT CONNECT
-            GUI.Label(new Rect(cx, cy, cw, 20), "4. DIRECT CONNECT VIA IP", GameUI.Overline); cy += 24;
-
-            float ipW = cw * 0.68f - 8;
-            float portW = cw - ipW - 14;
-
-            // IP
-            Rect rIp = new Rect(cx, cy, ipW, 38);
-            GameUI.Fill(rIp, new Color(0.02f, 0.04f, 0.08f, 0.95f), false);
-            GameUI.Fill(new Rect(rIp.x, rIp.y, rIp.width, 1), inBorder, false);
-            GameUI.Fill(new Rect(rIp.x, rIp.yMax - 1, rIp.width, 1), inBorder, false);
-            GameUI.Fill(new Rect(rIp.x, rIp.y, 1, rIp.height), inBorder, false);
-            GameUI.Fill(new Rect(rIp.xMax - 1, rIp.y, 1, rIp.height), inBorder, false);
-            GUI.backgroundColor = Color.clear;
-            address = GUI.TextField(new Rect(rIp.x + 10, rIp.y + 6, rIp.width - 20, 26), address, 24, GameUI.ModernInput);
-            GUI.backgroundColor = oldBg;
-
-            // Port
-            Rect rPort = new Rect(cx + ipW + 14, cy, portW, 38);
-            GameUI.Fill(rPort, new Color(0.02f, 0.04f, 0.08f, 0.95f), false);
-            GameUI.Fill(new Rect(rPort.x, rPort.y, rPort.width, 1), inBorder, false);
-            GameUI.Fill(new Rect(rPort.x, rPort.yMax - 1, rPort.width, 1), inBorder, false);
-            GameUI.Fill(new Rect(rPort.x, rPort.y, 1, rPort.height), inBorder, false);
-            GameUI.Fill(new Rect(rPort.xMax - 1, rPort.y, 1, rPort.height), inBorder, false);
-            GUI.backgroundColor = Color.clear;
-            port = GUI.TextField(new Rect(rPort.x + 10, rPort.y + 6, rPort.width - 20, 26), port, 8, GameUI.ModernInput);
-            GUI.backgroundColor = oldBg;
-            cy += 48;
-
-            // Join Button
-            Rect rJoin = new Rect(cx, cy, cw, 46);
-            if (GameUI.ModernButton(rJoin, "JOIN GAME", GameUI.NeonBlue))
+            if (GameUI.ModernButton(new Rect(cx + tabBtnW + 10, cy, tabBtnW, 36), "DIRECT IP / SERVER", networkModeTab == 1 ? GameUI.Mint : GameUI.PanelLight))
             {
-                StartSession(false);
+                networkModeTab = 1;
+            }
+            cy += 44;
+
+            if (networkModeTab == 0)
+            {
+                // ONLINE RELAY (JOIN CODE) MODE
+                GUI.Label(new Rect(cx, cy, cw, 20), "WORLDWIDE PLAY OVER INTERNET (NO IP NEEDED)", GameUI.Overline); cy += 20;
+
+                Rect rHostRelay = new Rect(cx, cy, cw, 42);
+                string hostBtnText = isPreparingRelay ? "CREATING ROOM..." : "CREATE ONLINE ROOM  (GET CODE)";
+                if (GameUI.ModernButton(rHostRelay, hostBtnText, GameUI.HotOrange))
+                {
+                    StartRelayHost();
+                }
+                cy += 50;
+
+                GUI.Label(new Rect(cx, cy, cw, 20), "OR ENTER FRIEND'S ROOM CODE", GameUI.Overline); cy += 20;
+                float pasteBtnW = 64;
+                float codeW = cw * 0.44f;
+                float joinBtnW = cw - codeW - pasteBtnW - 14;
+
+                Rect rCodeBox = new Rect(cx, cy, codeW, 40);
+                GameUI.Fill(rCodeBox, new Color(0.02f, 0.04f, 0.08f, 0.95f), false);
+                GameUI.Fill(new Rect(rCodeBox.x, rCodeBox.y, rCodeBox.width, 1), inBorder, false);
+                GameUI.Fill(new Rect(rCodeBox.x, rCodeBox.yMax - 1, rCodeBox.width, 1), inBorder, false);
+                GameUI.Fill(new Rect(rCodeBox.x, rCodeBox.y, 1, rCodeBox.height), inBorder, false);
+                GameUI.Fill(new Rect(rCodeBox.xMax - 1, rCodeBox.y, 1, rCodeBox.height), inBorder, false);
+
+                var codeInputStyle = new GUIStyle(GameUI.ModernInput) { fontSize = 15, alignment = TextAnchor.MiddleCenter };
+                GUI.backgroundColor = Color.clear;
+                inputRelayCode = GUI.TextField(new Rect(rCodeBox.x + 8, rCodeBox.y + 6, rCodeBox.width - 16, 28), inputRelayCode.ToUpperInvariant(), 8, codeInputStyle);
+                GUI.backgroundColor = oldBg;
+
+                if (GameUI.ModernButton(new Rect(cx + codeW + 6, cy, pasteBtnW, 40), "PASTE", GameUI.PanelLight))
+                {
+                    string clip = GUIUtility.systemCopyBuffer;
+                    if (!string.IsNullOrEmpty(clip))
+                    {
+                        inputRelayCode = clip.Trim().ToUpperInvariant();
+                        if (inputRelayCode.Length > 8) inputRelayCode = inputRelayCode.Substring(0, 8);
+                    }
+                }
+
+                Rect rJoinRelay = new Rect(cx + codeW + pasteBtnW + 12, cy, joinBtnW, 40);
+                string joinBtnText = isPreparingRelay ? "CONNECTING..." : "JOIN ROOM";
+                if (GameUI.ModernButton(rJoinRelay, joinBtnText, GameUI.NeonBlue))
+                {
+                    StartRelayClient(inputRelayCode);
+                }
+                cy += 46;
+            }
+            else
+            {
+                // DIRECT IP / DEDICATED SERVER MODE
+                GUI.Label(new Rect(cx, cy, cw, 20), "HOST OR CONNECT TO DEDICATED SERVER / LAN", GameUI.Overline); cy += 20;
+
+                Rect rHost = new Rect(cx, cy, cw, 42);
+                if (GameUI.ModernButton(rHost, "HOST SERVER / LAN", GameUI.HotOrange))
+                {
+                    StartSession(true);
+                }
+                cy += 50;
+
+                GUI.Label(new Rect(cx, cy, cw, 20), "SERVER IP / DOMAIN & PORT", GameUI.Overline); cy += 20;
+                float ipW = cw * 0.68f - 8;
+                float portW = cw - ipW - 14;
+
+                Rect rIp = new Rect(cx, cy, ipW, 38);
+                GameUI.Fill(rIp, new Color(0.02f, 0.04f, 0.08f, 0.95f), false);
+                GameUI.Fill(new Rect(rIp.x, rIp.y, rIp.width, 1), inBorder, false);
+                GameUI.Fill(new Rect(rIp.x, rIp.yMax - 1, rIp.width, 1), inBorder, false);
+                GameUI.Fill(new Rect(rIp.x, rIp.y, 1, rIp.height), inBorder, false);
+                GameUI.Fill(new Rect(rIp.xMax - 1, rIp.y, 1, rIp.height), inBorder, false);
+                GUI.backgroundColor = Color.clear;
+                address = GUI.TextField(new Rect(rIp.x + 10, rIp.y + 6, rIp.width - 20, 26), address, 36, GameUI.ModernInput);
+                GUI.backgroundColor = oldBg;
+
+                Rect rPort = new Rect(cx + ipW + 14, cy, portW, 38);
+                GameUI.Fill(rPort, new Color(0.02f, 0.04f, 0.08f, 0.95f), false);
+                GameUI.Fill(new Rect(rPort.x, rPort.y, rPort.width, 1), inBorder, false);
+                GameUI.Fill(new Rect(rPort.x, rPort.yMax - 1, rPort.width, 1), inBorder, false);
+                GameUI.Fill(new Rect(rPort.x, rPort.y, 1, rPort.height), inBorder, false);
+                GameUI.Fill(new Rect(rPort.xMax - 1, rPort.y, 1, rPort.height), inBorder, false);
+                GUI.backgroundColor = Color.clear;
+                port = GUI.TextField(new Rect(rPort.x + 10, rPort.y + 6, rPort.width - 20, 26), port, 8, GameUI.ModernInput);
+                GUI.backgroundColor = oldBg;
+                cy += 46;
+
+                Rect rJoin = new Rect(cx, cy, cw, 42);
+                if (GameUI.ModernButton(rJoin, "JOIN VIA IP / DOMAIN", GameUI.NeonBlue))
+                {
+                    StartSession(false);
+                }
+                cy += 46;
             }
 
             // ── RIGHT PANEL: MATCH OBJECTIVES & INTEL ──
@@ -501,6 +750,25 @@ namespace WhosWatching
             GUI.Label(new Rect(cx, cy + 24, cw, 20),
                 connecting ? "Connecting to host session..." : "Pick your character, choose a side, then hit READY!", GameUI.Small);
             cy += 48;
+
+            if (!string.IsNullOrEmpty(relayJoinCode))
+            {
+                Rect rCodeBanner = new Rect(cx, cy, cw, 62);
+                GameUI.Fill(rCodeBanner, new Color(0.02f, 0.10f, 0.18f, 0.95f), false);
+                GameUI.Fill(new Rect(rCodeBanner.x, rCodeBanner.y, 5, rCodeBanner.height), GameUI.Mint, false);
+                var codeStyle = new GUIStyle(GameUI.Heading) { fontSize = 20, alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold };
+                codeStyle.normal.textColor = GameUI.Mint;
+                GUI.Label(new Rect(rCodeBanner.x + 16, rCodeBanner.y + 7, cw - 145, 26), $"ROOM CODE:  {relayJoinCode}", codeStyle);
+                var subStyle = new GUIStyle(GameUI.Small) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
+                subStyle.normal.textColor = GameUI.Cream;
+                GUI.Label(new Rect(rCodeBanner.x + 16, rCodeBanner.y + 35, cw - 145, 20), "Share this code with teammates to join worldwide!", subStyle);
+                if (GameUI.ModernButton(new Rect(rCodeBanner.xMax - 130, rCodeBanner.y + 11, 120, 40), "COPY CODE", GameUI.Mint))
+                {
+                    GUIUtility.systemCopyBuffer = relayJoinCode;
+                    Status = $"Room code {relayJoinCode} copied to clipboard!";
+                }
+                cy += 72;
+            }
 
             if (!string.IsNullOrEmpty(Status) && Status != "Offline")
             {
