@@ -24,10 +24,15 @@ namespace WhosWatching
         public static bool Endpoint(string host, string port, out ushort number)
         {
             number = 0;
-            return IPAddress.TryParse(host, out var ip) &&
-                ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
-                !ip.Equals(IPAddress.Any) && !ip.Equals(IPAddress.Broadcast) &&
-                ushort.TryParse(port, out number) && number > 0;
+            if (string.IsNullOrWhiteSpace(host) || !ushort.TryParse(port, out number) || number == 0) return false;
+            host = host.Trim();
+            if (IPAddress.TryParse(host, out var ip))
+            {
+                return ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
+                    !ip.Equals(IPAddress.Any) && !ip.Equals(IPAddress.Broadcast);
+            }
+            // Allow domain names with a dot (e.g. playit.gg, vps.example.com) but reject plain invalid words
+            return host.Contains(".") && System.Uri.CheckHostName(host) == System.UriHostNameType.Dns;
         }
         public static bool Newer(uint next, uint previous) => next != previous && unchecked((int)(next - previous)) > 0;
         public static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
