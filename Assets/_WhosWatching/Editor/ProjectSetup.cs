@@ -85,12 +85,20 @@ namespace WhosWatching.Editor
             var obj = GameObject.CreatePrimitive(PrimitiveType.Cube); obj.name = name;
             obj.transform.position = position; obj.transform.localScale = scale;
         }
+        [MenuItem("Who's Watching/Build Standalone Windows (.exe)")]
         public static void Build()
         {
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions {
-                scenes = new[] { Root + "Scenes/Arena.unity" }, locationPathName = "Builds/Windows/WhosWatching.exe",
-                target = BuildTarget.StandaloneWindows64, options = BuildOptions.Development });
-            if (report.summary.result != BuildResult.Succeeded) throw new System.Exception("Windows build failed: " + report.summary.result);
+                scenes = new[] { Root + "Scenes/Arena.unity" },
+                locationPathName = "Builds/Windows/WhosWatching.exe",
+                target = BuildTarget.StandaloneWindows64,
+                options = BuildOptions.None
+            });
+            if (report.summary.result != BuildResult.Succeeded)
+                throw new System.Exception("Windows build failed: " + report.summary.result);
+
+            Debug.Log("<color=#00FFCC><b>[Who's Watching]</b> Windows .exe built successfully at: Builds/Windows/WhosWatching.exe</color>");
+            EditorUtility.RevealInFinder("Builds/Windows/WhosWatching.exe");
         }
         public static void InstallGaze()
         {

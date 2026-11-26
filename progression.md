@@ -1,7 +1,13 @@
 # Project handoff — 2026-10-18
 
 ## Current status
-Requested Arena gameplay, configurable audio slots, cartoon lobby/HUD, Detailed/Essentials mode, player names and detailed developer README are implemented. Final build succeeded; 60/60 EditMode tests and final two-peer smoke passed. No commits/pushes. User explicitly allowed using the reserve to finish README; README is now complete. Recheck usage before any new implementation.
+Comprehensive UI/UX Upgrade completed (2026-10-25). Features implemented:
+1. Custom cartoon game logo ('Who's Watching?') generated and integrated on Main Menu, Lobby, Result Screen, and Project Splash settings.
+2. Full Settings Menu with persistent Graphics (Resolutions, Windowed/Fullscreen modes, Quality presets, VSync, Framerate), Audio (Master, Music, SFX sliders wired to AudioListener and ArenaAudio), and Controls (Mouse Sensitivity, Invert Look Y, bindings display, Restore Defaults).
+3. Cartoon UI Redesign with juicy hover effects, drop shadows, glossy bevels, responsive layouts, tabbed navigation, and celebratory result modals.
+4. Intelligent In-Game Objective Guidance with contextual dynamic directives, 3D rotating/pulsing beacon marker, off-screen radar arrow pointer with distance clamping, and celebratory objective completion toast alerts.
+5. Interactive reticle targeting interactable crates and stations.
+6. EditMode test suite expanded with GameSettingsTests.
 
 ## Main entry points
 - README.md is the current developer tuning guide: Inspector versus code settings, actual defaults, movement/gaze/punch/work/round rules, audio, names/UI, appearance, project/build settings and tuning recipes. User's cross-network connectivity question was intentionally excluded.
