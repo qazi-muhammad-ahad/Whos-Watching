@@ -132,6 +132,7 @@ namespace WhosWatching
                 View.fieldOfView = CameraFieldOfView.Value;
                 View.nearClipPlane = GazeRules.NearClip;
                 View.aspect = LocalAspect();
+                Minimap.Tick();
             }
         }
         float LocalAspect() => Mathf.Clamp((float)View.pixelWidth / Mathf.Max(1, View.pixelHeight), GazeRules.MinAspect, GazeRules.MaxAspect);
@@ -287,7 +288,7 @@ namespace WhosWatching
             if (!IsOwner) { DrawNameplate(); return; }
             using (GameUI.Begin())
             {
-                GameUI.Reticle();if(!GameUI.Details)return;
+                GameUI.Reticle();Minimap.Draw(this);if(!GameUI.Details)return;
                 var state=Gaze.Value;var arena=ArenaGameplay.Instance;
                 float y=GameUI.Height-150;
                 GameUI.Card(new Rect(24,y,300,136));
